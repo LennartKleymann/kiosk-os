@@ -4,7 +4,7 @@
   # Silent boot — no GRUB menu, no kernel messages, just splash
   boot = {
     loader = {
-      timeout = 0;
+      timeout = lib.mkForce 0;
       grub = {
         splashImage = null;
       };
