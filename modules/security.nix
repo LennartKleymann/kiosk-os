@@ -7,10 +7,11 @@
     ReserveVT=0
   '';
 
-  # Block Ctrl+Alt+Del
-  systemd.targets."ctrl-alt-del" = {
-    enable = false;
-  };
+  # Block Ctrl+Alt+Del reboot
+  services.logind.extraConfig = lib.mkAfter ''
+    HandleRebootKey=ignore
+    HandleRebootKeySec=0
+  '';
 
   # USB storage blocking (loaded at runtime based on config)
   # When removable_devices=no, this udev rule blocks USB mass storage
