@@ -1,16 +1,13 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Disable virtual consoles — no Ctrl+Alt+F1 escape
+  # Disable virtual consoles and Ctrl+Alt+Del
   services.logind.extraConfig = ''
     NAutoVTs=0
     ReserveVT=0
+    HandleRebootKey=ignore
+    HandleRebootKeySec=0
   '';
-
-  # Block Ctrl+Alt+Del
-  systemd.targets."ctrl-alt-del" = {
-    enable = false;
-  };
 
   # USB storage blocking (loaded at runtime based on config)
   # When removable_devices=no, this udev rule blocks USB mass storage
