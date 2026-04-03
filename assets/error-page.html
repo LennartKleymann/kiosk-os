@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kiosk-os — Connection Error</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.7;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+        }
+        p {
+            font-size: 1rem;
+            line-height: 1.6;
+            opacity: 0.7;
+        }
+        .retry {
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            opacity: 0.4;
+        }
+    </style>
+    <script>
+        // Auto-retry every 30 seconds
+        setTimeout(() => location.reload(), 30000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">&#9888;</div>
+        <h1>Service Unavailable</h1>
+        <p>The configured homepage could not be reached. Please check the network connection or contact your administrator.</p>
+        <p class="retry">Retrying automatically every 30 seconds...</p>
+    </div>
+</body>
+</html>
