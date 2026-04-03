@@ -10,5 +10,6 @@
     ./power.nix
     ./config-fetcher.nix
     ./admin.nix
+    ./installer.nix
   ];
 }

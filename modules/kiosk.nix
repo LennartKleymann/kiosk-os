@@ -7,6 +7,7 @@ let
     CONFIG_FILE="/etc/kiosk/config"
     HOMEPAGE="https://example.com"
     WALLPAPER=""
+    BROWSER_MODE="kiosk"
 
     # Load config if present
     if [ -f "$CONFIG_FILE" ]; then
@@ -19,8 +20,14 @@ let
         case "$key" in
           homepage) HOMEPAGE="$value" ;;
           wallpaper) WALLPAPER="$value" ;;
+          browser_mode) BROWSER_MODE="$value" ;;
         esac
       done < "$CONFIG_FILE"
+    fi
+
+    # Installer override: if the installer gate wrote a homepage override, use it
+    if [ -f /tmp/kiosk-homepage-override ]; then
+      HOMEPAGE=$(cat /tmp/kiosk-homepage-override)
     fi
 
     # Download wallpaper if configured
@@ -36,9 +43,20 @@ let
     # Note: Mouse cursor hiding is handled via seat configuration
     # See modules/display.nix for hide_mouse support
 
-    # Launch Chromium in kiosk mode
+    # Set browser mode flags
+    MODE_FLAGS=""
+    case "$BROWSER_MODE" in
+      fullscreen)
+        MODE_FLAGS="--start-fullscreen"
+        ;;
+      *)
+        MODE_FLAGS="--kiosk"
+        ;;
+    esac
+
+    # Launch Chromium
     exec ${pkgs.chromium}/bin/chromium \
-      --kiosk \
+      $MODE_FLAGS \
       --no-first-run \
       --noerrdialogs \
       --disable-infobars \
@@ -50,6 +68,7 @@ let
       --disable-translate \
       --disable-sync \
       --disable-features=TranslateUI \
+      --disable-gpu \
       --incognito \
       --ozone-platform=wayland \
       "$HOMEPAGE"
