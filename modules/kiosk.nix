@@ -7,7 +7,6 @@ let
     CONFIG_FILE="/etc/kiosk/config"
     HOMEPAGE="https://example.com"
     WALLPAPER=""
-    HIDE_MOUSE=0
 
     # Load config if present
     if [ -f "$CONFIG_FILE" ]; then
@@ -20,7 +19,6 @@ let
         case "$key" in
           homepage) HOMEPAGE="$value" ;;
           wallpaper) WALLPAPER="$value" ;;
-          hide_mouse) HIDE_MOUSE="$value" ;;
         esac
       done < "$CONFIG_FILE"
     fi
@@ -35,10 +33,8 @@ let
       ${pkgs.swaybg}/bin/swaybg -i /etc/kiosk/wallpaper-default.jpg -m fill &
     fi
 
-    # Hide mouse cursor after N seconds of inactivity
-    if [ "$HIDE_MOUSE" -gt 0 ] 2>/dev/null; then
-      ${pkgs.seat-daemon or ""}&
-    fi
+    # Note: Mouse cursor hiding is handled via seat configuration
+    # See modules/display.nix for hide_mouse support
 
     # Launch Chromium in kiosk mode
     exec ${pkgs.chromium}/bin/chromium \
