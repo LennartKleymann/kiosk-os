@@ -28,19 +28,32 @@ let
       echo "[kiosk-config] No USB/remote config found, using default"
     fi
 
-    # 3. If config has a kiosk_config URL, fetch remote config (overrides USB)
+    # 3. Preserve local-only settings before remote override
+    # auto_install must NEVER come from a remote config (security risk)
+    LOCAL_AUTO_INSTALL=""
+    if [ -f "$CONFIG_FILE" ]; then
+      LOCAL_AUTO_INSTALL=$(grep -E "^auto_install=" "$CONFIG_FILE" | cut -d'=' -f2- | xargs || echo "")
+    fi
+
+    # 4. If config has a kiosk_config URL, fetch remote config (overrides USB)
     if [ -f "$CONFIG_FILE" ]; then
       REMOTE_URL=$(grep -E "^kiosk_config=" "$CONFIG_FILE" | cut -d'=' -f2- | xargs)
       if [ -n "$REMOTE_URL" ]; then
         echo "[kiosk-config] Fetching remote config from $REMOTE_URL"
         if ${pkgs.curl}/bin/curl -sfL "$REMOTE_URL" -o "$CONFIG_FILE.remote" --connect-timeout 10; then
-          cp "$CONFIG_FILE.remote" "$CONFIG_FILE"
+          # Remove auto_install from remote config if present (security)
+          grep -v "^auto_install=" "$CONFIG_FILE.remote" > "$CONFIG_FILE"
           echo "[kiosk-config] Remote config loaded successfully"
         else
           echo "[kiosk-config] Remote config fetch failed, using local config"
         fi
         rm -f "$CONFIG_FILE.remote"
       fi
+    fi
+
+    # 5. Restore local-only auto_install setting
+    if [ -n "$LOCAL_AUTO_INSTALL" ]; then
+      echo "auto_install=$LOCAL_AUTO_INSTALL" >> "$CONFIG_FILE"
     fi
 
     # 4. Apply network config (WiFi)
