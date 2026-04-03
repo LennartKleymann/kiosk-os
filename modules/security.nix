@@ -18,6 +18,7 @@
   '';
 
   # Chromium policies for browser lockdown
+  # These apply in both kiosk and fullscreen mode
   environment.etc."chromium/policies/managed/kiosk-policy.json".text = builtins.toJSON {
     # Disable developer tools
     DeveloperToolsAvailability = 2;
@@ -39,6 +40,17 @@
     ExtensionInstallBlocklist = [ "*" ];
     # Disable incognito mode toggle (we force it via flags)
     IncognitoModeAvailability = 1;
+    # Disable browser sign-in
+    BrowserSignin = 0;
+    # Disable sync
+    SyncDisabled = true;
+    # Show home button (useful in fullscreen mode for navigation)
+    ShowHomeButton = true;
+    # Set new tab page to homepage (no empty tab)
+    HomepageIsNewTabPage = true;
+    # Disable tab creation (Ctrl+T)
+    # Note: In fullscreen mode tabs are visible but creating new ones is blocked
+    MaximumTabsPerBrowser = 1;
     # URL whitelist/blacklist (configured at runtime by config-fetcher)
     # URLAllowlist and URLBlocklist are set dynamically
   };

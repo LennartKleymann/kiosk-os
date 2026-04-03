@@ -7,6 +7,7 @@ let
     CONFIG_FILE="/etc/kiosk/config"
     HOMEPAGE="https://example.com"
     WALLPAPER=""
+    BROWSER_MODE="kiosk"
 
     # Load config if present
     if [ -f "$CONFIG_FILE" ]; then
@@ -19,6 +20,7 @@ let
         case "$key" in
           homepage) HOMEPAGE="$value" ;;
           wallpaper) WALLPAPER="$value" ;;
+          browser_mode) BROWSER_MODE="$value" ;;
         esac
       done < "$CONFIG_FILE"
     fi
@@ -41,9 +43,20 @@ let
     # Note: Mouse cursor hiding is handled via seat configuration
     # See modules/display.nix for hide_mouse support
 
-    # Launch Chromium in kiosk mode
+    # Set browser mode flags
+    MODE_FLAGS=""
+    case "$BROWSER_MODE" in
+      fullscreen)
+        MODE_FLAGS="--start-fullscreen"
+        ;;
+      *)
+        MODE_FLAGS="--kiosk"
+        ;;
+    esac
+
+    # Launch Chromium
     exec ${pkgs.chromium}/bin/chromium \
-      --kiosk \
+      $MODE_FLAGS \
       --no-first-run \
       --noerrdialogs \
       --disable-infobars \
