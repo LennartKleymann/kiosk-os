@@ -6,11 +6,11 @@
   };
 
   outputs = { self, nixpkgs }: let
-    system = "x86_64-linux";
-    pkgs = nixpkgs.legacyPackages.${system};
+    # The kiosk image is always x86_64-linux
+    targetSystem = "x86_64-linux";
 
     kioskSystem = nixpkgs.lib.nixosSystem {
-      inherit system;
+      system = targetSystem;
       modules = [
         ./modules/default.nix
         "${nixpkgs}/nixos/modules/installer/cd-dvd/iso-image.nix"
@@ -26,12 +26,20 @@
         })
       ];
     };
+
+    # Expose packages for all common build hosts
+    forAllSystems = nixpkgs.lib.genAttrs [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+      "x86_64-darwin"
+    ];
   in {
     nixosConfigurations.kiosk = kioskSystem;
 
-    packages.${system} = {
+    packages = forAllSystems (buildSystem: {
       iso = kioskSystem.config.system.build.isoImage;
-      default = self.packages.${system}.iso;
-    };
+      default = kioskSystem.config.system.build.isoImage;
+    });
   };
 }
