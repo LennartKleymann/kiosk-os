@@ -1,14 +1,10 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Disable virtual consoles — no Ctrl+Alt+F1 escape
+  # Disable virtual consoles and Ctrl+Alt+Del
   services.logind.extraConfig = ''
     NAutoVTs=0
     ReserveVT=0
-  '';
-
-  # Block Ctrl+Alt+Del reboot
-  services.logind.extraConfig = lib.mkAfter ''
     HandleRebootKey=ignore
     HandleRebootKeySec=0
   '';
