@@ -19,10 +19,13 @@ let
       fi
     fi
 
-    # 2. Use USB config as base
+    # 2. Use USB config as base, or fall back to default
     if [ -n "$USB_CONFIG_FILE" ]; then
       cp "$USB_CONFIG_FILE" "$CONFIG_FILE"
       echo "[kiosk-config] Loaded config from USB"
+    elif [ ! -f "$CONFIG_FILE" ] && [ -f /etc/kiosk/default.conf ]; then
+      cp /etc/kiosk/default.conf "$CONFIG_FILE"
+      echo "[kiosk-config] No USB/remote config found, using default"
     fi
 
     # 3. If config has a kiosk_config URL, fetch remote config (overrides USB)
@@ -106,6 +109,12 @@ in
       RemainAfterExit = true;
       ExecStart = "${configFetcherScript}";
     };
+  };
+
+  # Ship default config with the image
+  environment.etc."kiosk/default.conf" = {
+    source = ../configs/default.conf;
+    mode = "0644";
   };
 
   # Ensure config directory and chromium policy directory exist
