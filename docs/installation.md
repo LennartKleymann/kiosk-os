@@ -54,7 +54,28 @@ Alternatively, host the config on a web server and set `kiosk_config=https://you
 2. Set the BIOS to boot from USB (usually F12 or DEL during startup)
 3. The kiosk boots directly into the fullscreen browser
 
-## Updating the Config
+## Installing to Internal Disk
+
+By default, kiosk-os runs as a live system from the USB stick. To install it permanently to the internal disk:
+
+1. Add `auto_install=yes` to your config file
+2. Boot from USB
+3. The installer UI appears in the browser instead of the homepage
+4. Select the target disk — the installer shows all detected disks with model, size, and type
+5. **Confirm** that you want to erase the selected disk (all data will be permanently deleted)
+6. Wait for the installation to complete (progress is shown in the browser)
+7. Remove the USB stick and reboot
+
+After installation, the kiosk boots directly from the internal disk. The USB stick is only needed once.
+
+### Updating the config after disk installation
+
+The internal disk has a separate FAT32 partition labeled `KIOSK_CFG`. To update the config:
+
+- **Remote config (recommended):** Set `kiosk_config=https://...` and update the file on your server
+- **Manual:** Boot from another USB/system, mount the `KIOSK_CFG` partition, edit `kiosk.conf`
+
+## Updating the Config (USB Live)
 
 ### Remote config (recommended for multiple kiosks)
 

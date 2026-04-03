@@ -25,10 +25,20 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | Parameter | Values | Default | Description |
 |---|---|---|---|
 | `homepage` | URL | `https://example.com` | **Required.** The URL shown in the kiosk browser |
+| `browser_mode` | `kiosk`, `fullscreen` | `kiosk` | Browser UI mode (see below) |
 | `whitelist` | domains (pipe-separated) | — | Only allow these domains. All others are blocked |
-| `disable_navigation_bar` | `yes`, `no` | `no` | Hide the browser navigation bar |
-| `disable_address_bar` | `yes`, `no` | `no` | Hide the browser address bar |
 | `right_mouse_click` | `yes`, `no` | `yes` | Allow right-click context menu |
+
+### Browser Modes
+
+| Mode | UI Elements | Escape possible? | Use case |
+|---|---|---|---|
+| `kiosk` | Nothing — no toolbar, no address bar, no buttons | No | Locked-down public terminals |
+| `fullscreen` | Full toolbar (back, forward, address bar) in fullscreen | Yes (F11) | Internal apps where navigation is needed |
+
+**`kiosk`** (default): Chromium runs in true kiosk mode. No UI elements, no way to exit fullscreen. The user can only interact with the web page. Best for public-facing terminals.
+
+**`fullscreen`**: Chromium runs in fullscreen with the full toolbar visible (back button, forward button, address bar). The whitelist still protects against navigating to unauthorized domains — the address bar is visible but restricted. Tabs, bookmarks, downloads, and developer tools are disabled via Chromium policies.
 
 ## Display
 
@@ -73,6 +83,26 @@ scheduled_action=Monday-03:00 Tuesday-03:00 Wednesday-03:00 Thursday-03:00 Frida
 | Parameter | Values | Default | Description |
 |---|---|---|---|
 | `kiosk_config` | URL | — | Remote config URL. Fetched on every boot. Overrides local config |
+
+## Installation
+
+| Parameter | Values | Default | Description |
+|---|---|---|---|
+| `auto_install` | `yes`, `no` | `no` | Show disk installer when booting from live USB |
+
+When `auto_install=yes` is set and the system detects it is running from a live USB stick, a browser-based installer UI is shown instead of the homepage. The installer:
+
+1. Detects all available internal disks
+2. Shows disk details (model, size, type) and warns about removable devices
+3. **Requires explicit confirmation** before erasing any disk
+4. Partitions the disk (EFI + root + config partition)
+5. Copies the kiosk-os system to the internal disk
+6. Shows real-time installation progress
+7. Prompts to remove the USB stick and reboot
+
+After installation, the system boots from the internal disk and goes directly to the configured homepage. The USB stick is no longer needed.
+
+The config partition (`KIOSK_CFG`) on the internal disk is a separate FAT32 partition that can be mounted from another system to update the configuration.
 
 ## Administration
 
