@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kiosk-os — Install</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 640px;
+            padding: 2rem;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.02em;
+        }
+
+        .logo p {
+            font-size: 0.9rem;
+            color: #888;
+            margin-top: 0.25rem;
+        }
+
+        /* Steps */
+        .step { display: none; }
+        .step.active { display: block; }
+
+        /* Disk list */
+        .disk-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+        }
+
+        .disk-card {
+            background: #1a1a2e;
+            border: 2px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .disk-card:hover {
+            border-color: #4a4a6e;
+            background: #1e1e32;
+        }
+
+        .disk-card.selected {
+            border-color: #6366f1;
+            background: #1e1e38;
+        }
+
+        .disk-card .disk-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .disk-card .disk-info {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .disk-card .disk-info span {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .disk-card .disk-warning {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #f59e0b;
+        }
+
+        /* Warning box */
+        .warning-box {
+            background: #2d1b1b;
+            border: 1px solid #5c2626;
+            border-radius: 10px;
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box h3 {
+            color: #ef4444;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .warning-box p {
+            font-size: 0.9rem;
+            color: #cca0a0;
+            line-height: 1.5;
+        }
+
+        .warning-box .disk-target {
+            font-family: monospace;
+            background: #3d2020;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            color: #ff8888;
+        }
+
+        /* Buttons */
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.85rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: #fff;
+        }
+
+        .btn-primary:hover { background: #5558e6; }
+
+        .btn-primary:disabled {
+            background: #3a3a5e;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #1a1a2e;
+            color: #aaa;
+            border: 1px solid #2a2a3e;
+        }
+
+        .btn-secondary:hover { background: #222238; }
+
+        .btn-danger {
+            background: #dc2626;
+            color: #fff;
+        }
+
+        .btn-danger:hover { background: #c42020; }
+
+        /* Progress */
+        .progress-container {
+            margin: 2rem 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #1a1a2e;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #6366f1;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        .progress-status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+        }
+
+        .progress-steps {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: #555;
+        }
+
+        .progress-step.done { color: #22c55e; }
+        .progress-step.active { color: #e0e0e0; }
+
+        .progress-step .icon { width: 1.2rem; text-align: center; }
+
+        /* Success */
+        .success-icon {
+            text-align: center;
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .success-text {
+            text-align: center;
+        }
+
+        .success-text h2 {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+
+        .success-text p {
+            color: #888;
+            line-height: 1.6;
+        }
+
+        /* Skip link */
+        .skip-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .skip-link a {
+            color: #555;
+            font-size: 0.85rem;
+            text-decoration: none;
+        }
+
+        .skip-link a:hover { color: #888; }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid #333;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>kiosk-os</h1>
+            <p>Install to disk</p>
+        </div>
+
+        <!-- Step 1: Select Disk -->
+        <div class="step active" id="step-select">
+            <p>Select a disk to install kiosk-os. The selected disk will be completely erased.</p>
+
+            <div class="disk-list" id="disk-list">
+                <div style="text-align: center; padding: 2rem; color: #555;">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 0.75rem;">Detecting disks...</p>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-primary" id="btn-next" disabled onclick="showConfirm()">Continue</button>
+            </div>
+
+            <div class="skip-link">
+                <a href="#" onclick="skipInstall()">Skip — continue running from USB</a>
+            </div>
+        </div>
+
+        <!-- Step 2: Confirm -->
+        <div class="step" id="step-confirm">
+            <div class="warning-box">
+                <h3>All data will be permanently deleted</h3>
+                <p>
+                    You are about to install kiosk-os to
+                    <span class="disk-target" id="confirm-disk-name"></span>.
+                    <br><br>
+                    This will erase the entire disk including all partitions and data.
+                    This action cannot be undone.
+                </p>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="showStep('step-select')">Back</button>
+                <button class="btn btn-danger" onclick="startInstall()">Erase disk and install</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Installing -->
+        <div class="step" id="step-install">
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-status" id="progress-status">Starting installation...</div>
+            </div>
+
+            <div class="progress-steps" id="progress-steps">
+                <div class="progress-step" data-step="partition">
+                    <span class="icon">○</span> Partitioning disk
+                </div>
+                <div class="progress-step" data-step="format">
+                    <span class="icon">○</span> Formatting partitions
+                </div>
+                <div class="progress-step" data-step="copy">
+                    <span class="icon">○</span> Copying system files
+                </div>
+                <div class="progress-step" data-step="bootloader">
+                    <span class="icon">○</span> Installing bootloader
+                </div>
+                <div class="progress-step" data-step="config">
+                    <span class="icon">○</span> Writing configuration
+                </div>
+                <div class="progress-step" data-step="finalize">
+                    <span class="icon">○</span> Finalizing
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Done -->
+        <div class="step" id="step-done">
+            <div class="success-icon">&#10003;</div>
+            <div class="success-text">
+                <h2>Installation complete</h2>
+                <p>
+                    kiosk-os has been installed successfully.
+                    <br><br>
+                    Remove the USB stick and restart the machine
+                    to boot from the internal disk.
+                </p>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="reboot()">Reboot now</button>
+            </div>
+        </div>
+
+        <!-- Error state -->
+        <div class="step" id="step-error">
+            <div class="warning-box">
+                <h3>Installation failed</h3>
+                <p id="error-message">An unexpected error occurred during installation.</p>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="showStep('step-select')">Try again</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:8484';
+        let selectedDisk = null;
+
+        async function loadDisks() {
+            try {
+                const res = await fetch(`${API}/disks`);
+                const disks = await res.json();
+                renderDisks(disks);
+            } catch (e) {
+                // Retry after 2 seconds (API might not be ready yet)
+                setTimeout(loadDisks, 2000);
+            }
+        }
+
+        function renderDisks(disks) {
+            const list = document.getElementById('disk-list');
+
+            if (disks.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#555;padding:2rem;">No suitable disks found.</p>';
+                return;
+            }
+
+            list.innerHTML = disks.map(d => `
+                <div class="disk-card" onclick="selectDisk(this, '${d.path}')" data-path="${d.path}">
+                    <div class="disk-name">${d.model || d.path}</div>
+                    <div class="disk-info">
+                        <span>${d.size}</span>
+                        <span>${d.path}</span>
+                        <span>${d.transport || ''}</span>
+                    </div>
+                    ${d.removable ? '<div class="disk-warning">&#9888; This appears to be a removable device</div>' : ''}
+                </div>
+            `).join('');
+        }
+
+        function selectDisk(el, path) {
+            document.querySelectorAll('.disk-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedDisk = path;
+            document.getElementById('btn-next').disabled = false;
+        }
+
+        function showStep(id) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function showConfirm() {
+            if (!selectedDisk) return;
+            const card = document.querySelector(`.disk-card[data-path="${selectedDisk}"]`);
+            const name = card.querySelector('.disk-name').textContent;
+            document.getElementById('confirm-disk-name').textContent = `${name} (${selectedDisk})`;
+            showStep('step-confirm');
+        }
+
+        async function startInstall() {
+            showStep('step-install');
+
+            try {
+                const res = await fetch(`${API}/install`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ disk: selectedDisk })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+
+                // Poll for progress
+                pollProgress();
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        async function pollProgress() {
+            try {
+                const res = await fetch(`${API}/progress`);
+                const data = await res.json();
+
+                // Update progress bar
+                document.getElementById('progress-fill').style.width = data.percent + '%';
+                document.getElementById('progress-status').textContent = data.message;
+
+                // Update step indicators
+                document.querySelectorAll('.progress-step').forEach(el => {
+                    const step = el.dataset.step;
+                    if (data.completed.includes(step)) {
+                        el.classList.add('done');
+                        el.classList.remove('active');
+                        el.querySelector('.icon').textContent = '✓';
+                    } else if (data.current === step) {
+                        el.classList.add('active');
+                        el.querySelector('.icon').textContent = '●';
+                    }
+                });
+
+                if (data.status === 'done') {
+                    showStep('step-done');
+                } else if (data.status === 'error') {
+                    showError(data.message);
+                } else {
+                    setTimeout(pollProgress, 1000);
+                }
+            } catch (e) {
+                setTimeout(pollProgress, 2000);
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('error-message').textContent = msg;
+            showStep('step-error');
+        }
+
+        async function skipInstall() {
+            try {
+                await fetch(`${API}/skip`, { method: 'POST' });
+            } catch (e) {}
+            // Browser will be redirected to homepage by the kiosk service
+        }
+
+        async function reboot() {
+            try {
+                await fetch(`${API}/reboot`, { method: 'POST' });
+            } catch (e) {}
+        }
+
+        // Start
+        loadDisks();
+    </script>
+</body>
+</html>

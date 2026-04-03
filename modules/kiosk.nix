@@ -23,6 +23,11 @@ let
       done < "$CONFIG_FILE"
     fi
 
+    # Installer override: if the installer gate wrote a homepage override, use it
+    if [ -f /tmp/kiosk-homepage-override ]; then
+      HOMEPAGE=$(cat /tmp/kiosk-homepage-override)
+    fi
+
     # Download wallpaper if configured
     if [ -n "$WALLPAPER" ]; then
       ${pkgs.curl}/bin/curl -sL "$WALLPAPER" -o /tmp/wallpaper.jpg 2>/dev/null || true
@@ -50,6 +55,7 @@ let
       --disable-translate \
       --disable-sync \
       --disable-features=TranslateUI \
+      --disable-gpu \
       --incognito \
       --ozone-platform=wayland \
       "$HOMEPAGE"
