@@ -129,4 +129,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for co
 
 ## License
 
-[GPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE)
