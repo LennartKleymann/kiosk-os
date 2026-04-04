@@ -12,7 +12,13 @@ let
     IS_LIVE="no"
 
     # Check if running from live media
-    if findmnt -n / | grep -qE 'tmpfs|overlay|squashfs' 2>/dev/null; then
+    # NixOS live ISOs: root is tmpfs, or /iso exists, or no /etc/NIXOS_LUSTRATE
+    if findmnt -n / | grep -qE 'tmpfs|overlay|squashfs|nix-store' 2>/dev/null; then
+      IS_LIVE="yes"
+    elif [ -d /iso ] || [ -d /nix/.ro-store ]; then
+      IS_LIVE="yes"
+    elif ! [ -f /etc/fstab ] || [ "$(wc -l < /etc/fstab 2>/dev/null)" -lt 2 ]; then
+      # Live systems typically have empty or minimal fstab
       IS_LIVE="yes"
     fi
 

@@ -404,10 +404,10 @@
 
             list.innerHTML = disks.map(d => `
                 <div class="disk-card" onclick="selectDisk(this, '${d.path}')" data-path="${d.path}">
-                    <div class="disk-name">${d.model || d.path}</div>
+                    <div class="disk-name">${d.model || d.path || 'Unknown Disk'}</div>
                     <div class="disk-info">
-                        <span>${d.size}</span>
-                        <span>${d.path}</span>
+                        <span>${d.size || 'Unknown size'}</span>
+                        <span>${d.path || ''}</span>
                         <span>${d.transport || ''}</span>
                     </div>
                     ${d.removable ? '<div class="disk-warning">&#9888; This appears to be a removable device</div>' : ''}

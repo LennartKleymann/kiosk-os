@@ -25,11 +25,17 @@ def get_disks():
                 continue
             if d.get("name", "").startswith("loop"):
                 continue
+            name = d.get("name", "")
+            path = d.get("path") or f"/dev/{name}"
+            model = (d.get("model") or "").strip()
+            size = d.get("size") or "unknown"
+            tran = d.get("tran") or ""
+
             disks.append({
-                "path": d.get("path", f"/dev/{d.get('name', '')}"),
-                "size": d.get("size", "unknown"),
-                "model": (d.get("model") or d.get("name", "Unknown")).strip(),
-                "transport": d.get("tran") or "",
+                "path": path,
+                "size": size,
+                "model": model if model else path,
+                "transport": tran,
                 "removable": d.get("rm") in (True, "1", 1),
             })
         return disks
