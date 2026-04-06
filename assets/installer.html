@@ -402,17 +402,22 @@
                 return;
             }
 
-            list.innerHTML = disks.map(d => `
-                <div class="disk-card" onclick="selectDisk(this, '${d.path}')" data-path="${d.path}">
-                    <div class="disk-name">${d.model || d.path || 'Unknown Disk'}</div>
+            list.innerHTML = disks.map(d => {
+                const path = d.path || '/dev/???';
+                const model = d.model && d.model !== 'null' ? d.model : path;
+                const size = d.size && d.size !== 'null' ? d.size : 'Unknown size';
+                const transport = d.transport && d.transport !== 'null' ? d.transport : '';
+                return `
+                <div class="disk-card" onclick="selectDisk(this, '${path}')" data-path="${path}">
+                    <div class="disk-name">${model}</div>
                     <div class="disk-info">
-                        <span>${d.size || 'Unknown size'}</span>
-                        <span>${d.path || ''}</span>
-                        <span>${d.transport || ''}</span>
+                        <span>${size}</span>
+                        <span>${path}</span>
+                        <span>${transport}</span>
                     </div>
                     ${d.removable ? '<div class="disk-warning">&#9888; This appears to be a removable device</div>' : ''}
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function selectDisk(el, path) {

@@ -3,11 +3,12 @@
 {
   # SSH is disabled by default
   # The config-fetcher enables it at runtime if admin_ssh=yes is set
+  # TODO: revert to lib.mkDefault false after debugging
   services.openssh = {
-    enable = lib.mkDefault false;
+    enable = true;
     settings = {
-      PasswordAuthentication = false;
-      PermitRootLogin = "no";
+      PasswordAuthentication = true;
+      PermitRootLogin = "yes";
     };
   };
 
@@ -15,7 +16,9 @@
   users.users.admin = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
-    # SSH key is set at runtime by config-fetcher
     openssh.authorizedKeys.keys = [ ];
   };
+
+  # TODO: remove after debugging — temporary root password for VM testing
+  users.users.root.initialPassword = "kiosk";
 }

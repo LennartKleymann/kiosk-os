@@ -3,6 +3,7 @@
 let
   configFetcherScript = pkgs.writeShellScript "kiosk-config-fetcher" ''
     set -euo pipefail
+    export PATH="/run/current-system/sw/bin:$PATH"
 
     CONFIG_DIR="/etc/kiosk"
     CONFIG_FILE="$CONFIG_DIR/config"

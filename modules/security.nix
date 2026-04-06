@@ -2,9 +2,10 @@
 
 {
   # Disable virtual consoles and Ctrl+Alt+Del
+  # TODO: revert NAutoVTs=0 after debugging
   services.logind.extraConfig = ''
-    NAutoVTs=0
-    ReserveVT=0
+    NAutoVTs=6
+    ReserveVT=6
     HandleRebootKey=ignore
     HandleRebootKeySec=0
   '';

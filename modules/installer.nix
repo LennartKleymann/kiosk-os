@@ -6,6 +6,7 @@ let
   # Decides: show installer UI or go straight to homepage
   installerGateScript = pkgs.writeShellScript "kiosk-installer-gate" ''
     set -euo pipefail
+    export PATH="/run/current-system/sw/bin:$PATH"
 
     CONFIG_FILE="/etc/kiosk/config"
     AUTO_INSTALL="no"
@@ -52,7 +53,7 @@ in
     };
   };
 
-  # Ship installer HTML
+  # Ship installer HTML (v2 — fixed undefined disk metadata)
   environment.etc."kiosk/installer.html" = {
     source = ../assets/installer.html;
     mode = "0644";

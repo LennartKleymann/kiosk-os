@@ -10,6 +10,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 INSTALL_STATE = {"status": "idle", "percent": 0, "message": "", "current": "", "completed": []}
 CONFIG_FILE = "/etc/kiosk/config"
 
+# NixOS puts binaries in /run/current-system/sw/bin, ensure it's in PATH
+os.environ["PATH"] = "/run/current-system/sw/bin:" + os.environ.get("PATH", "")
+
 
 def get_disks():
     """List available disks using lsblk."""

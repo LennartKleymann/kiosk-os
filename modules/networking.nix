@@ -17,7 +17,8 @@
     # Firewall: only allow outbound, block all inbound by default
     firewall = {
       enable = true;
-      allowedTCPPorts = [ ];
+      # TODO: remove 22 after debugging
+      allowedTCPPorts = [ 22 ];
       allowedUDPPorts = [ ];
     };
   };
