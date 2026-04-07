@@ -1,14 +1,9 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Silent boot — no GRUB menu, no kernel messages, just splash
+  # Silent boot — no boot menu, no kernel messages, just splash
   boot = {
-    loader = {
-      timeout = lib.mkForce 0;
-      grub = {
-        splashImage = null;
-      };
-    };
+    loader.timeout = lib.mkForce 0;
 
     consoleLogLevel = 0;
     initrd.verbose = false;
