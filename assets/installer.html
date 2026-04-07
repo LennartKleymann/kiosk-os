@@ -500,9 +500,15 @@
 
         async function skipInstall() {
             try {
-                await fetch(`${API}/skip`, { method: 'POST' });
+                const res = await fetch(`${API}/skip`, { method: 'POST' });
+                const data = await res.json();
+                if (data.homepage) {
+                    window.location.href = data.homepage;
+                    return;
+                }
             } catch (e) {}
-            // Browser will be redirected to homepage by the kiosk service
+            // Fallback: read homepage from config
+            window.location.href = 'https://example.com';
         }
 
         async function reboot() {

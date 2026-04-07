@@ -69,8 +69,15 @@ def run_install(disk: str):
         part_root = f"{disk}{p}2"
         part_config = f"{disk}{p}3"
 
-        # Step 1: Partition
+        # Step 1: Unmount and partition
         update("running", 5, f"Partitioning {disk}...", "partition", [])
+        # Unmount any existing partitions on target disk
+        for i in range(1, 10):
+            subprocess.run(f"umount {disk}{p}{i} 2>/dev/null", shell=True)
+            subprocess.run(f"umount {disk}{i} 2>/dev/null", shell=True)
+        subprocess.run(f"umount /mnt/kiosk-install/boot 2>/dev/null", shell=True)
+        subprocess.run(f"umount /mnt/kiosk-install 2>/dev/null", shell=True)
+        subprocess.run(f"umount /mnt/kiosk-config 2>/dev/null", shell=True)
         run(f"wipefs -a {disk}")
         run(f"parted -s {disk} mklabel gpt")
         run(f"parted -s {disk} mkpart ESP fat32 1MiB 513MiB")
@@ -86,17 +93,58 @@ def run_install(disk: str):
         run(f"mkfs.ext4 -L KIOSK_ROOT -F {part_root}")
         run(f"mkfs.fat -F32 -n KIOSK_CFG {part_config}")
 
-        # Step 3: Copy system
-        update("running", 35, "Copying system files (this may take a few minutes)...", "copy", ["partition", "format"])
+        # Step 3: Mount and copy current system
+        update("running", 30, "Mounting target disk...", "copy", ["partition", "format"])
         run("mkdir -p /mnt/kiosk-install")
         run(f"mount {part_root} /mnt/kiosk-install")
         run("mkdir -p /mnt/kiosk-install/boot")
         run(f"mount {part_efi} /mnt/kiosk-install/boot")
-        run("nixos-install --root /mnt/kiosk-install --no-root-passwd --system /run/current-system")
 
-        # Step 4: Bootloader
-        update("running", 80, "Installing bootloader...", "bootloader", ["partition", "format", "copy"])
-        run("bootctl install --path=/mnt/kiosk-install/boot || true")
+        # Copy the running NixOS system directly to disk
+        # This copies the entire nix store closure needed by the current system
+        update("running", 35, "Copying system files (this may take a few minutes)...", "copy", ["partition", "format"])
+        current_system = subprocess.run("readlink -f /run/current-system", shell=True, capture_output=True, text=True).stdout.strip()
+        run(f"nixos-install --root /mnt/kiosk-install --no-root-passwd --system {current_system} --no-channel-copy")
+
+        # Step 4: Fix boot configuration for disk
+        # The live system uses ISO boot config, we need systemd-boot for disk
+        update("running", 80, "Configuring bootloader...", "bootloader", ["partition", "format", "copy"])
+        run("bootctl install --root=/mnt/kiosk-install")
+
+        # Create boot entry
+        root_uuid = subprocess.run(f"blkid -s UUID -o value {part_root}", shell=True, capture_output=True, text=True).stdout.strip()
+        system_init = subprocess.run("readlink -f /run/current-system/init", shell=True, capture_output=True, text=True).stdout.strip()
+        kernel = subprocess.run("readlink -f /run/current-system/kernel", shell=True, capture_output=True, text=True).stdout.strip()
+        initrd = subprocess.run("readlink -f /run/current-system/initrd", shell=True, capture_output=True, text=True).stdout.strip()
+        kernel_params = subprocess.run("cat /run/current-system/kernel-params", shell=True, capture_output=True, text=True).stdout.strip()
+
+        # Copy kernel and initrd to boot partition
+        run(f"cp {kernel} /mnt/kiosk-install/boot/kernel")
+        run(f"cp {initrd} /mnt/kiosk-install/boot/initrd")
+
+        # Write systemd-boot entry
+        run("mkdir -p /mnt/kiosk-install/boot/loader/entries")
+        boot_entry = f"""title kiosk-os
+linux /kernel
+initrd /initrd
+options init={system_init} root=UUID={root_uuid} {kernel_params}
+"""
+        with open("/mnt/kiosk-install/boot/loader/entries/kiosk-os.conf", "w") as f:
+            f.write(boot_entry)
+
+        # Write loader.conf
+        with open("/mnt/kiosk-install/boot/loader/loader.conf", "w") as f:
+            f.write("default kiosk-os.conf\ntimeout 0\neditor no\n")
+
+        # Step 5: Write fstab so NixOS knows how to mount filesystems
+        update("running", 85, "Writing filesystem configuration...", "bootloader", ["partition", "format", "copy"])
+        efi_uuid = subprocess.run(f"blkid -s UUID -o value {part_efi}", shell=True, capture_output=True, text=True).stdout.strip()
+        fstab = f"""UUID={root_uuid} / ext4 defaults 0 1
+UUID={efi_uuid} /boot vfat fmask=0022,dmask=0022 0 2
+"""
+        run("mkdir -p /mnt/kiosk-install/etc")
+        with open("/mnt/kiosk-install/etc/fstab", "w") as f:
+            f.write(fstab)
 
         # Step 5: Config
         update("running", 90, "Writing configuration...", "config", ["partition", "format", "copy", "bootloader"])
@@ -172,7 +220,15 @@ class InstallerHandler(BaseHTTPRequestHandler):
 
         elif self.path == "/skip":
             open("/tmp/kiosk-skip-install", "w").close()
-            self.send_json({"status": "skipped"})
+            # Read homepage from config
+            homepage = "https://example.com"
+            if os.path.exists(CONFIG_FILE):
+                for line in open(CONFIG_FILE):
+                    line = line.strip()
+                    if line.startswith("homepage="):
+                        homepage = line.split("=", 1)[1].strip()
+                        break
+            self.send_json({"status": "skipped", "homepage": homepage})
 
         elif self.path == "/reboot":
             self.send_json({"status": "rebooting"})
