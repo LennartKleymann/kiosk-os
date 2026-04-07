@@ -9,12 +9,10 @@ let
     WALLPAPER=""
     BROWSER_MODE="kiosk"
 
-    # Load config if present
+    # Parse config
     if [ -f "$CONFIG_FILE" ]; then
       while IFS='=' read -r key value; do
-        # Skip comments and empty lines
         [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-        # Trim whitespace
         key=$(echo "$key" | xargs)
         value=$(echo "$value" | xargs)
         case "$key" in
@@ -25,12 +23,12 @@ let
       done < "$CONFIG_FILE"
     fi
 
-    # Installer override: if the installer gate wrote a homepage override, use it
+    # Installer override
     if [ -f /tmp/kiosk-homepage-override ]; then
       HOMEPAGE=$(cat /tmp/kiosk-homepage-override)
     fi
 
-    # Download wallpaper if configured
+    # Wallpaper
     if [ -n "$WALLPAPER" ]; then
       ${pkgs.curl}/bin/curl -sL "$WALLPAPER" -o /tmp/wallpaper.jpg 2>/dev/null || true
       if [ -f /tmp/wallpaper.jpg ]; then
@@ -40,18 +38,11 @@ let
       ${pkgs.swaybg}/bin/swaybg -i /etc/kiosk/wallpaper-default.jpg -m fill &
     fi
 
-    # Note: Mouse cursor hiding is handled via seat configuration
-    # See modules/display.nix for hide_mouse support
-
-    # Set browser mode flags
+    # Browser mode flags
     MODE_FLAGS=""
     case "$BROWSER_MODE" in
-      fullscreen)
-        MODE_FLAGS="--start-fullscreen"
-        ;;
-      *)
-        MODE_FLAGS="--kiosk"
-        ;;
+      fullscreen) MODE_FLAGS="--start-fullscreen" ;;
+      *)          MODE_FLAGS="--kiosk" ;;
     esac
 
     # Launch Chromium
@@ -75,7 +66,6 @@ let
   '';
 in
 {
-  # Create kiosk user
   users.users.kiosk = {
     isNormalUser = true;
     home = "/home/kiosk";
@@ -83,7 +73,6 @@ in
   };
   users.groups.kiosk = {};
 
-  # Auto-login and start Cage with kiosk script
   services.cage = {
     enable = true;
     user = "kiosk";
@@ -91,12 +80,10 @@ in
     extraArguments = [ "-d" ];
   };
 
-  # Ensure config directory exists
   systemd.tmpfiles.rules = [
     "d /etc/kiosk 0755 root root -"
   ];
 
-  # Required packages available system-wide
   environment.systemPackages = with pkgs; [
     chromium
     cage
@@ -104,11 +91,9 @@ in
     curl
   ];
 
-  # Allow Chromium to run in Wayland
   environment.sessionVariables = {
     NIXOS_OZONE_WL = "1";
   };
 
-  # Hardware acceleration
   hardware.graphics.enable = true;
 }

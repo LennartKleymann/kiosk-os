@@ -100,11 +100,10 @@ nix build .#iso
 
 The ISO will be at `result/iso/kiosk-os.iso`.
 
-For development, test in a VM:
+For testing in a VM (e.g., QEMU, UTM, VirtualBox):
 
 ```bash
-nix build .#vm
-./result/bin/run-kiosk-vm
+qemu-system-x86_64 -cdrom result/iso/kiosk-os.iso -m 2G -enable-kvm
 ```
 
 ## Project Structure

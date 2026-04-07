@@ -27,7 +27,7 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | `homepage` | URL | `https://example.com` | **Required.** The URL shown in the kiosk browser |
 | `browser_mode` | `kiosk`, `fullscreen` | `kiosk` | Browser UI mode (see below) |
 | `whitelist` | domains (pipe-separated) | — | Only allow these domains. All others are blocked |
-| `right_mouse_click` | `yes`, `no` | `yes` | Allow right-click context menu |
+| `right_mouse_click` | `yes`, `no` | `yes` | *Planned.* Allow right-click context menu |
 
 ### Browser Modes
 
@@ -45,9 +45,9 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | Parameter | Values | Default | Description |
 |---|---|---|---|
 | `wallpaper` | URL | — | Wallpaper image URL, downloaded at boot |
-| `hide_mouse` | seconds (integer) | `0` | Hide cursor after N seconds of inactivity. `0` = never |
+| `hide_mouse` | seconds (integer) | `0` | *Planned.* Hide cursor after N seconds of inactivity |
 | `timezone` | tz string | `Europe/Berlin` | System timezone |
-| `primary_keyboard_layout` | layout code | `us` | Keyboard layout (e.g., `de`, `fr`, `es`) |
+| `primary_keyboard_layout` | layout code | `us` | *Planned.* Keyboard layout (e.g., `de`, `fr`, `es`) |
 
 ## Power Management
 
@@ -55,7 +55,7 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 |---|---|---|---|
 | `session_idle` | minutes (integer) | `0` | Reset browser session after N minutes of inactivity. `0` = disabled |
 | `dpms_idle` | minutes (integer) | `0` | Turn off display after N minutes of inactivity. `0` = disabled. Any input wakes instantly |
-| `scheduled_action` | see below | — | Execute commands on a schedule |
+| `scheduled_action` | see below | — | *Planned.* Execute commands on a schedule |
 
 ### Scheduled Actions
 
@@ -110,4 +110,4 @@ The config partition (`KIOSK_CFG`) on the internal disk is a separate FAT32 part
 |---|---|---|---|
 | `admin_ssh` | `yes`, `no` | `no` | Enable SSH access for remote management |
 | `admin_ssh_key` | SSH public key | — | Authorized SSH key for the admin user |
-| `admin_ssh_port` | port number | `22` | SSH port |
+| `admin_ssh_port` | port number | `22` | *Planned.* SSH port |
