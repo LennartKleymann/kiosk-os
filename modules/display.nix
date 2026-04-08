@@ -1,8 +1,6 @@
-{ config, lib, pkgs, ... }:
+{ lib, pkgs, ... }:
 
 {
-  boot.plymouth.enable = true;
-
   # Default wallpaper shipped with the image
   environment.etc."kiosk/wallpaper-default.jpg" = lib.mkIf (builtins.pathExists ../assets/wallpaper-default.jpg) {
     source = ../assets/wallpaper-default.jpg;

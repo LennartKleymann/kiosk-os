@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ pkgs, ... }:
 
 let
   installerApi = pkgs.writeScript "kiosk-installer-api" (builtins.readFile ../scripts/kiosk-installer-api.py);

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ pkgs, ... }:
 
 let
   configFetcherScript = pkgs.writeShellScript "kiosk-config-fetcher" ''
@@ -12,10 +12,13 @@ let
     # 1. Check for config on USB partition labeled KIOSK_CFG
     if [ -b /dev/disk/by-label/KIOSK_CFG ]; then
       mkdir -p /mnt/kiosk-cfg
-      mount -o ro /dev/disk/by-label/KIOSK_CFG /mnt/kiosk-cfg 2>/dev/null || true
-      if [ -f /mnt/kiosk-cfg/kiosk.conf ]; then
-        USB_CONFIG_FILE="/mnt/kiosk-cfg/kiosk.conf"
-        echo "[kiosk-config] Found config on USB partition"
+      if mount -o ro /dev/disk/by-label/KIOSK_CFG /mnt/kiosk-cfg; then
+        if [ -f /mnt/kiosk-cfg/kiosk.conf ]; then
+          USB_CONFIG_FILE="/mnt/kiosk-cfg/kiosk.conf"
+          echo "[kiosk-config] Found config on USB partition"
+        fi
+      else
+        echo "[kiosk-config] Failed to mount KIOSK_CFG partition"
       fi
     fi
 

@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   # Silent boot — no boot menu, no kernel messages, just splash
