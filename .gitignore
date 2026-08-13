@@ -6,3 +6,7 @@ result-*
 *.iso
 .DS_Store
 __pycache__/
+
+# .NET build output
+bin/
+obj/

@@ -1,0 +1,58 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:KioskOsWizard.ViewModels"
+             x:DataType="vm:ConfigStepViewModel"
+             x:Class="KioskOsWizard.Views.ConfigStepView">
+    <StackPanel Spacing="20" MaxWidth="560">
+        <!-- Homepage -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Homepage URL" Foreground="White" FontWeight="SemiBold"/>
+            <TextBlock Text="The page the kiosk will show at all times"
+                       Foreground="#888" FontSize="12"/>
+            <TextBox Text="{Binding Homepage}"
+                     Watermark="https://your-app.com"
+                     Background="#1a1a2e" Foreground="White"
+                     BorderBrush="#2a2a3e" Padding="10,8"/>
+        </StackPanel>
+
+        <!-- Browser Mode -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Browser mode" Foreground="White" FontWeight="SemiBold"/>
+            <RadioButton Content="Kiosk — no UI, fully locked down"
+                         IsChecked="{Binding BrowserModeKiosk}"
+                         Foreground="#ddd" GroupName="Browser"/>
+            <RadioButton Content="Fullscreen — with back button and toolbar"
+                         IsChecked="{Binding !BrowserModeKiosk}"
+                         Foreground="#ddd" GroupName="Browser"/>
+        </StackPanel>
+
+        <!-- Whitelist -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Domain whitelist (optional)" Foreground="White" FontWeight="SemiBold"/>
+            <TextBlock Text="Pipe-separated list. Only these domains will load."
+                       Foreground="#888" FontSize="12"/>
+            <TextBox Text="{Binding Whitelist}"
+                     Watermark="example.com|api.example.com"
+                     Background="#1a1a2e" Foreground="White"
+                     BorderBrush="#2a2a3e" Padding="10,8"/>
+        </StackPanel>
+
+        <!-- Network -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Network" Foreground="White" FontWeight="SemiBold"/>
+            <CheckBox Content="Use WiFi" IsChecked="{Binding UseWifi}"
+                      Foreground="#ddd"/>
+            <StackPanel Spacing="8" Margin="24,4,0,0"
+                        IsVisible="{Binding UseWifi}">
+                <TextBox Text="{Binding WifiSsid}"
+                         Watermark="WiFi network name (SSID)"
+                         Background="#1a1a2e" Foreground="White"
+                         BorderBrush="#2a2a3e" Padding="10,8"/>
+                <TextBox Text="{Binding WifiPassword}" PasswordChar="•"
+                         Watermark="WiFi password"
+                         Background="#1a1a2e" Foreground="White"
+                         BorderBrush="#2a2a3e" Padding="10,8"/>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

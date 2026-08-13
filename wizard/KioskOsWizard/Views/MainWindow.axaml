@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:KioskOsWizard.ViewModels"
+        xmlns:views="using:KioskOsWizard.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="720"
+        x:Class="KioskOsWizard.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="kiosk-os Setup Wizard"
+        Width="800" Height="720"
+        MinWidth="720" MinHeight="600"
+        Background="#0f0f1a">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="0">
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="32,24,32,16" Background="#0f0f1a">
+            <StackPanel>
+                <TextBlock Text="kiosk-os" FontSize="26" FontWeight="Bold" Foreground="White"/>
+                <TextBlock Text="{Binding CurrentStep.Title}" FontSize="14" Foreground="#888" Margin="0,2,0,0"/>
+                <ProgressBar Margin="0,16,0,0" Height="3"
+                             Minimum="0" Maximum="{Binding TotalSteps}"
+                             Value="{Binding CurrentStepNumber}"
+                             Foreground="#6366f1" Background="#1a1a2e"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer Grid.Row="1" Padding="32,16,32,16"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <ContentControl Content="{Binding CurrentStep}"/>
+        </ScrollViewer>
+
+        <!-- Footer Navigation -->
+        <Border Grid.Row="2" Padding="32,16,32,24" Background="#0f0f1a">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}"
+                           Foreground="#888" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="Back" Margin="0,0,8,0"
+                        Padding="16,8" IsEnabled="{Binding CanGoBack}"
+                        Command="{Binding BackCommand}"
+                        Background="#1a1a2e" Foreground="#aaa"
+                        BorderBrush="#2a2a3e"/>
+                <Button Grid.Column="2" Content="{Binding NextButtonText}"
+                        Padding="20,8" IsEnabled="{Binding CanGoNext}"
+                        Command="{Binding NextCommand}"
+                        Background="#6366f1" Foreground="White"
+                        BorderBrush="#6366f1"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
