@@ -20,6 +20,30 @@ Before each scenario, **reset the VM to a clean disk** — either a fresh
 checkpoint or a recreated VHDX. Several scenarios only behave correctly on an
 empty disk.
 
+## Testing a real USB stick in Hyper-V
+
+Hyper-V cannot pass a USB stick through as a USB device. It can, however,
+attach the stick as a **physical disk**, which is enough to boot from it and is
+the only way to test what the wizard actually produced.
+
+1. Write the stick with the wizard.
+2. Open `diskmgmt.msc`, right-click the stick's disk (the left-hand grey
+   panel, not a partition) and choose **Offline**. Hyper-V only accepts disks
+   the host has released.
+3. VM settings → **SCSI Controller** → **Hard Drive** → **Add** → **Physical
+   hard disk**, pick the stick.
+4. Move it to the top of the boot order in **Firmware**, and remove the ISO
+   from the DVD drive so you are certain what booted.
+
+Set the stick back to **Online** in Disk Management afterwards, otherwise
+Windows keeps ignoring it.
+
+Two caveats: the VM must be Generation 2 with Secure Boot off, and a stick
+attached this way is exclusively owned by the VM while it runs.
+
+For scenarios that only need the image and not a real stick, attaching the ISO
+as a virtual DVD is faster and does not touch hardware.
+
 ## Scenario 1 — Fresh boot, nothing configured
 
 The case that matters most: someone downloads the ISO and boots it. Nothing

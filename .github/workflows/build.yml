@@ -17,6 +17,13 @@ jobs:
       - name: Installer API tests
         run: python3 tests/test_installer_api.py
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Wizard tests
+        run: dotnet test wizard/KioskOsWizard.Tests --nologo
+
   wizard:
     runs-on: ubuntu-latest
     permissions:

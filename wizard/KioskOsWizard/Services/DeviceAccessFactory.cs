@@ -30,19 +30,19 @@ public class FileDeviceAccess : IDeviceAccess
 
     public FileDeviceAccess(int sectorSize = 512) => _sectorSize = sectorSize;
 
-    public Task PrepareForWritingAsync(string devicePath, CancellationToken cancellationToken = default)
+    public virtual Task PrepareForWritingAsync(string devicePath, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
-    public Stream OpenWrite(string devicePath) =>
+    public virtual Stream OpenWrite(string devicePath) =>
         new FileStream(devicePath, FileMode.Create, FileAccess.Write, FileShare.Read);
 
-    public Stream OpenRead(string devicePath) =>
+    public virtual Stream OpenRead(string devicePath) =>
         new FileStream(devicePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-    public int GetSectorSize(string devicePath) => _sectorSize;
+    public virtual int GetSectorSize(string devicePath) => _sectorSize;
 
-    public Task FinishWritingAsync(string devicePath, CancellationToken cancellationToken = default)
+    public virtual Task FinishWritingAsync(string devicePath, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
-    public bool HasRequiredPrivileges() => true;
+    public virtual bool HasRequiredPrivileges() => true;
 }
