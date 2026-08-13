@@ -29,13 +29,14 @@ public partial class MainWindowViewModel : ViewModelBase
         var usbService = UsbServiceFactory.Create();
         var flashService = new FlashService();
         var githubService = new GithubReleaseService();
+        var configWriter = new ConfigWriterService();
 
         _steps = new List<StepViewModel>
         {
             new WelcomeStepViewModel(_config),
             new ConfigStepViewModel(_config),
             new UsbStepViewModel(_config, usbService, githubService),
-            new FlashStepViewModel(_config, flashService),
+            new FlashStepViewModel(_config, flashService, configWriter),
         };
 
         _currentStep = _steps[0];

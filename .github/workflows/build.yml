@@ -17,6 +17,48 @@ jobs:
       - name: Installer API tests
         run: python3 tests/test_installer_api.py
 
+  wizard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - runtime: win-x64
+            artifact: kiosk-os-wizard-windows
+          - runtime: linux-x64
+            artifact: kiosk-os-wizard-linux
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish wizard
+        run: |
+          dotnet publish wizard/KioskOsWizard \
+            -c Release \
+            -r ${{ matrix.runtime }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o publish/${{ matrix.runtime }}
+
+      - name: Upload wizard
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: publish/${{ matrix.runtime }}/
+          retention-days: 14
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          files: publish/${{ matrix.runtime }}/KioskOsWizard*
+
   build:
     runs-on: ubuntu-latest
     needs: test

@@ -11,6 +11,7 @@ namespace KioskOsWizard.ViewModels;
 public partial class FlashStepViewModel : StepViewModel
 {
     private readonly FlashService _flashService;
+    private readonly ConfigWriterService _configWriter;
     private CancellationTokenSource? _cts;
 
     [ObservableProperty]
@@ -37,10 +38,14 @@ public partial class FlashStepViewModel : StepViewModel
     [ObservableProperty]
     private string _isoPath = "";
 
-    public FlashStepViewModel(KioskConfig config, FlashService flashService) : base(config)
+    public FlashStepViewModel(
+        KioskConfig config,
+        FlashService flashService,
+        ConfigWriterService configWriter) : base(config)
     {
         Title = "Flash the USB stick";
         _flashService = flashService;
+        _configWriter = configWriter;
     }
 
     public override bool CanProceed => IsDone;
@@ -62,24 +67,24 @@ public partial class FlashStepViewModel : StepViewModel
     {
         if (IsFlashing) return;
 
+        if (!_flashService.HasRequiredPrivileges())
+        {
+            ErrorMessage = PrivilegeHint;
+            return;
+        }
+
         IsFlashing = true;
         ErrorMessage = null;
         _cts = new CancellationTokenSource();
 
         try
         {
-            await _flashService.FlashAsync(
-                IsoPath,
-                DevicePath,
-                (written, total) =>
-                {
-                    var pct = total > 0 ? (double)written / total * 100 : 0;
-                    ProgressPercent = pct;
-                    ProgressText = $"Writing... {pct:F0}% ({FormatBytes(written)} / {FormatBytes(total)})";
-                },
-                _cts.Token);
+            await _flashService.FlashAsync(IsoPath, DevicePath, Report, _cts.Token);
 
-            ProgressText = "Flashing complete!";
+            ProgressText = "Writing the configuration...";
+            await _configWriter.WriteAsync(Config.ToConfigFileContent(), _cts.Token);
+
+            ProgressText = "Done — the stick is ready.";
             IsDone = true;
             OnPropertyChanged(nameof(CanProceed));
         }
@@ -89,7 +94,7 @@ public partial class FlashStepViewModel : StepViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            ErrorMessage = "Permission denied. Try running the wizard as administrator.";
+            ErrorMessage = PrivilegeHint;
         }
         catch (Exception ex)
         {
@@ -105,6 +110,23 @@ public partial class FlashStepViewModel : StepViewModel
     private void Cancel()
     {
         _cts?.Cancel();
+    }
+
+    private static string PrivilegeHint => OperatingSystem.IsWindows()
+        ? "Writing to a USB stick needs administrator rights. Close the wizard and start it again with \"Run as administrator\"."
+        : "Writing to a USB stick needs root. Start the wizard with pkexec or sudo.";
+
+    private void Report(FlashProgress p)
+    {
+        var pct = p.Total > 0 ? (double)p.Current / p.Total * 100 : 0;
+        ProgressPercent = pct;
+        ProgressText = p.Stage switch
+        {
+            FlashStage.Preparing => "Preparing the device...",
+            FlashStage.Writing => $"Writing... {pct:F0}% ({FormatBytes(p.Current)} / {FormatBytes(p.Total)})",
+            FlashStage.Verifying => $"Verifying... {pct:F0}%",
+            _ => ProgressText,
+        };
     }
 
     private static string FormatBytes(long bytes)
