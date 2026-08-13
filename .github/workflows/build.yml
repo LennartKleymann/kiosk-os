@@ -71,6 +71,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: publish/${{ matrix.runtime }}/KioskOsWizard*
 
   build:
@@ -127,6 +128,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             dist/kiosk-os.iso
             dist/kiosk-os.iso.sha256
