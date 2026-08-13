@@ -71,6 +71,8 @@ jobs:
     needs: test
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v5
 
@@ -96,6 +98,15 @@ jobs:
           sha256sum kiosk-os.iso > kiosk-os.iso.sha256
           cat kiosk-os.iso.sha256
           ls -lh kiosk-os.iso
+
+      # Ties the image cryptographically to this commit and this workflow, so
+      # anyone can check where it came from without having to trust us:
+      #   gh attestation verify kiosk-os.iso --repo LennartKleymann/kiosk-os
+      - name: Attest build provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/kiosk-os.iso
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v5

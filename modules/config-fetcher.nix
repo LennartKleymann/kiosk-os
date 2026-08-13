@@ -54,9 +54,22 @@ let
     LOCAL_AUTO_INSTALL=$(config_value auto_install "")
 
     REMOTE_URL=$(config_value kiosk_config "")
+    case "$REMOTE_URL" in
+      "") ;;
+      https://*) ;;
+      *)
+        # The remote config decides what the screen shows. Over plain HTTP
+        # anyone on the network could point a kiosk at a page of their
+        # choosing, so an unencrypted URL is refused rather than trusted.
+        echo "[kiosk-config] Refusing non-HTTPS remote config: $REMOTE_URL"
+        REMOTE_URL=""
+        ;;
+    esac
+
     if [ -n "$REMOTE_URL" ]; then
       echo "[kiosk-config] Fetching remote config from $REMOTE_URL"
-      if ${pkgs.curl}/bin/curl -sfL "$REMOTE_URL" -o "$CONFIG_FILE.remote" --connect-timeout 10; then
+      if ${pkgs.curl}/bin/curl -sfL --proto '=https' --proto-redir '=https' \
+          "$REMOTE_URL" -o "$CONFIG_FILE.remote" --connect-timeout 10; then
         grep -v "^[[:space:]]*auto_install[[:space:]]*=" "$CONFIG_FILE.remote" > "$CONFIG_FILE.clean" || true
         mv "$CONFIG_FILE.clean" "$CONFIG_FILE"
         echo "[kiosk-config] Remote config loaded"

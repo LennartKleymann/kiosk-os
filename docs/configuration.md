@@ -61,7 +61,7 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 
 | Parameter | Values | Default | Description |
 |---|---|---|---|
-| `kiosk_config` | URL | — | Remote config URL. Fetched on every boot. Overrides local config |
+| `kiosk_config` | URL | — | Remote config URL. Fetched on every boot. Overrides local config. **Must be HTTPS** — plain HTTP is refused, and `auto_install` is stripped from whatever it returns |
 
 ## Installation
 
