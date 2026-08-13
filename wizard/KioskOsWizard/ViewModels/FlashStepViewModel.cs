@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -82,9 +83,27 @@ public partial class FlashStepViewModel : StepViewModel
             await _flashService.FlashAsync(IsoPath, DevicePath, Report, _cts.Token);
 
             ProgressText = "Writing the configuration...";
-            await _configWriter.WriteAsync(Config.ToConfigFileContent(), _cts.Token);
+            var config = Config.ToConfigFileContent();
 
-            ProgressText = "Done — the stick is ready.";
+            try
+            {
+                await _configWriter.WriteAsync(config, DevicePath, _cts.Token);
+                ProgressText = "Done — the stick is ready.";
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The image is written and the stick boots; it just falls back
+                // to the default config. Reporting that as a failed flash would
+                // send the user through the whole process again for nothing.
+                WizardLog.Error("Writing the configuration failed", ex);
+                ProgressText = "Written, but the configuration could not be saved.";
+                ErrorMessage =
+                    $"{ex.Message}\n\nThe stick boots and can be installed from — it will use " +
+                    $"the default settings. To apply yours, copy the configuration onto the " +
+                    $"{ConfigWriterService.PartitionLabel} partition as {ConfigWriterService.ConfigFileName}.";
+                SaveConfigBesideLog(config);
+            }
+
             IsDone = true;
             OnPropertyChanged(nameof(CanProceed));
         }
@@ -111,6 +130,25 @@ public partial class FlashStepViewModel : StepViewModel
     private void Cancel()
     {
         _cts?.Cancel();
+    }
+
+    /// <summary>
+    /// Keeps the generated config where the user can find it, so a failed
+    /// write does not mean typing everything in again.
+    /// </summary>
+    private static void SaveConfigBesideLog(string content)
+    {
+        try
+        {
+            var path = Path.Combine(
+                Path.GetDirectoryName(WizardLog.FilePath)!, ConfigWriterService.ConfigFileName);
+            File.WriteAllText(path, content);
+            WizardLog.Info($"Configuration saved to {path}");
+        }
+        catch (Exception ex)
+        {
+            WizardLog.Error("Could not save the configuration locally", ex);
+        }
     }
 
     private static string PrivilegeHint => OperatingSystem.IsWindows()

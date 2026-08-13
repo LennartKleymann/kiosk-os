@@ -22,14 +22,16 @@ public class ConfigWriterService
     private static readonly TimeSpan PartitionWait = TimeSpan.FromSeconds(20);
 
     public virtual async Task WriteAsync(
-        string content, CancellationToken cancellationToken = default)
+        string content, string? devicePath = null, CancellationToken cancellationToken = default)
     {
-        var mountPoint = await WaitForPartitionAsync(cancellationToken);
+        var mountPoint = await WaitForPartitionAsync(devicePath, cancellationToken);
 
         if (mountPoint is null)
             throw new IOException(
-                $"Could not find the {PartitionLabel} partition on the stick. " +
-                "The image may predate the config partition, or the stick was removed.");
+                $"Could not reach the {PartitionLabel} partition on the stick. " +
+                "It is present on the image, but the system did not make it accessible. " +
+                "Unplugging and reinserting the stick usually fixes this; the configuration " +
+                "can also be copied onto that partition by hand as kiosk.conf.");
 
         var target = Path.Combine(mountPoint, ConfigFileName);
 
@@ -42,17 +44,29 @@ public class ConfigWriterService
             throw new IOException("The configuration did not survive being written to the stick.");
     }
 
-    private async Task<string?> WaitForPartitionAsync(CancellationToken cancellationToken)
+    private async Task<string?> WaitForPartitionAsync(string? devicePath, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + PartitionWait;
+        var assigned = false;
 
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var mountPoint = await FindMountPointAsync(cancellationToken);
+            var mountPoint = await FindMountPointAsync(devicePath, cancellationToken);
             if (mountPoint is not null)
+            {
+                WizardLog.Info($"Config partition reachable at {mountPoint}");
                 return mountPoint;
+            }
+
+            // Windows does not always hand a drive letter to every partition
+            // on a removable disk. Ask for one once, then keep waiting.
+            if (!assigned && devicePath is not null && OperatingSystem.IsWindows())
+            {
+                assigned = true;
+                await AssignDriveLetterAsync(devicePath, cancellationToken);
+            }
 
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
@@ -60,10 +74,10 @@ public class ConfigWriterService
         return null;
     }
 
-    protected virtual Task<string?> FindMountPointAsync(CancellationToken cancellationToken)
+    protected virtual Task<string?> FindMountPointAsync(string? devicePath, CancellationToken cancellationToken)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return FindOnWindowsAsync(cancellationToken);
+            return FindOnWindowsAsync(devicePath, cancellationToken);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             return FindOnLinuxAsync(cancellationToken);
 
@@ -71,34 +85,80 @@ public class ConfigWriterService
             $"Writing the config is not supported on {RuntimeInformation.OSDescription} yet.");
     }
 
-    private static async Task<string?> FindOnWindowsAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Prefers the volume GUID path over a drive letter. The GUID path always
+    /// exists once the volume is known, survives letter reassignment, and does
+    /// not require changing anything about the user's system. The letter is
+    /// only a fallback, and worth logging because it is what the user can
+    /// actually open in Explorer afterwards.
+    ///
+    /// Scoping to the disk that was just written avoids picking up a second
+    /// kiosk stick that happens to be plugged in.
+    /// </summary>
+    private static async Task<string?> FindOnWindowsAsync(string? devicePath, CancellationToken cancellationToken)
     {
-        var script =
-            $"Get-Volume -FileSystemLabel {PartitionLabel} -ErrorAction SilentlyContinue | " +
-            "Select-Object -ExpandProperty DriveLetter | ConvertTo-Json";
+        var diskNumber = devicePath is null ? null : WindowsDeviceAccess.ExtractDiskNumber(devicePath);
+
+        var source = diskNumber is null
+            ? $"Get-Volume -FileSystemLabel {PartitionLabel} -ErrorAction SilentlyContinue"
+            : $"Get-Partition -DiskNumber {diskNumber} -ErrorAction SilentlyContinue | Get-Volume | " +
+              $"Where-Object {{ $_.FileSystemLabel -eq '{PartitionLabel}' }}";
+
+        var script = source + " | Select-Object -First 1 -Property DriveLetter,Path | ConvertTo-Json";
 
         var output = await RunAsync("powershell", $"-NoProfile -Command \"{script}\"", cancellationToken);
         if (string.IsNullOrWhiteSpace(output)) return null;
 
         try
         {
-            using var doc = JsonDocument.Parse(output.TrimStart().StartsWith('[') ? output : $"[{output}]");
-            foreach (var e in doc.RootElement.EnumerateArray())
-            {
-                var letter = e.ValueKind == JsonValueKind.Number
-                    ? ((char)e.GetInt32()).ToString()
-                    : e.GetString();
+            using var doc = JsonDocument.Parse(output);
+            var root = doc.RootElement.ValueKind == JsonValueKind.Array
+                ? doc.RootElement[0]
+                : doc.RootElement;
 
-                if (!string.IsNullOrWhiteSpace(letter))
-                    return $"{letter}:\\";
+            string? letter = null;
+            if (root.TryGetProperty("DriveLetter", out var dl) && dl.ValueKind != JsonValueKind.Null)
+            {
+                letter = dl.ValueKind == JsonValueKind.Number
+                    ? ((char)dl.GetInt32()).ToString()
+                    : dl.GetString();
             }
+
+            if (root.TryGetProperty("Path", out var p) && p.ValueKind == JsonValueKind.String)
+            {
+                var path = p.GetString();
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    if (!string.IsNullOrWhiteSpace(letter))
+                        WizardLog.Info($"Config partition is also mounted as {letter}:");
+                    return path;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(letter))
+                return $"{letter}:\\";
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IndexOutOfRangeException)
         {
             return null;
         }
 
         return null;
+    }
+
+    private static async Task AssignDriveLetterAsync(string devicePath, CancellationToken cancellationToken)
+    {
+        var diskNumber = WindowsDeviceAccess.ExtractDiskNumber(devicePath);
+        if (diskNumber is null) return;
+
+        WizardLog.Info($"No drive letter for {PartitionLabel}, requesting one on disk {diskNumber}");
+
+        var script =
+            $"$p = Get-Partition -DiskNumber {diskNumber} | " +
+            $"Where-Object {{ ($_ | Get-Volume -ErrorAction SilentlyContinue).FileSystemLabel -eq '{PartitionLabel}' }}; " +
+            "if ($p) { $p | Add-PartitionAccessPath -AssignDriveLetter -ErrorAction SilentlyContinue }";
+
+        await RunAsync("powershell", $"-NoProfile -Command \"{script}\"", cancellationToken);
     }
 
     private static async Task<string?> FindOnLinuxAsync(CancellationToken cancellationToken)
