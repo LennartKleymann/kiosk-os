@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="kiosk-token" content="__KIOSK_TOKEN__">
     <title>kiosk-os — Install</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -380,8 +381,17 @@
     </div>
 
     <script>
-        const API = 'http://localhost:8484';
+        const API = '';
+        const TOKEN = document.querySelector('meta[name="kiosk-token"]')?.content || '';
         let selectedDisk = null;
+
+        function post(path, body) {
+            return fetch(`${API}${path}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Kiosk-Token': TOKEN },
+                body: body === undefined ? undefined : JSON.stringify(body),
+            });
+        }
 
         async function loadDisks() {
             try {
@@ -473,11 +483,7 @@
             showStep('step-install');
 
             try {
-                const res = await fetch(`${API}/install`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ disk: selectedDisk })
-                });
+                const res = await post('/install', { disk: selectedDisk });
 
                 if (!res.ok) throw new Error(await res.text());
 
@@ -529,7 +535,7 @@
 
         async function skipInstall() {
             try {
-                const res = await fetch(`${API}/skip`, { method: 'POST' });
+                const res = await post('/skip');
                 const data = await res.json();
                 if (data.homepage) {
                     window.location.href = data.homepage;
@@ -542,7 +548,7 @@
 
         async function reboot() {
             try {
-                await fetch(`${API}/reboot`, { method: 'POST' });
+                await post('/reboot');
             } catch (e) {}
         }
 

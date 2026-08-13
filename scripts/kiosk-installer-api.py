@@ -12,11 +12,14 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 CONFIG_FILE = "/etc/kiosk/config"
 DISK_SYSTEM_FILE = "/etc/kiosk/disk-system"
+INSTALLER_HTML = "/etc/kiosk/installer.html"
+TOKEN_FILE = "/run/kiosk/installer-token"
 STATE_FILE = "/tmp/kiosk-install-state.json"
 TARGET = "/mnt"
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = 8484
 VALID_DISK_PATH = re.compile(r"^/dev/[a-zA-Z0-9]+$")
+ALLOWED_ORIGINS = {f"http://{LISTEN_HOST}:{LISTEN_PORT}"}
 
 # NixOS stores binaries in /run/current-system/sw/bin
 os.environ["PATH"] = "/run/current-system/sw/bin:" + os.environ.get("PATH", "")
@@ -63,9 +66,43 @@ def wait_for_partition(part_path, timeout=10):
     return False
 
 
-def get_disks():
-    """List available disks via lsblk."""
+def read_token():
+    """Read the one-time token written by the installer gate."""
     try:
+        with open(TOKEN_FILE) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def boot_disks():
+    """Parent disks of the live boot medium — never valid install targets."""
+    found = set()
+    for source in ("/iso", "/nix/.ro-store", "/"):
+        try:
+            src = subprocess.run(
+                ["findmnt", "-n", "-o", "SOURCE", "--target", source],
+                capture_output=True, text=True,
+            ).stdout.strip()
+        except Exception:
+            continue
+        if not src.startswith("/dev/"):
+            continue
+        try:
+            parent = subprocess.run(
+                ["lsblk", "-n", "-o", "PKNAME", src],
+                capture_output=True, text=True,
+            ).stdout.strip().split("\n")[0].strip()
+        except Exception:
+            parent = ""
+        found.add(f"/dev/{parent}" if parent else src)
+    return found
+
+
+def get_disks():
+    """List available disks via lsblk, excluding the live boot medium."""
+    try:
+        excluded = boot_disks()
         result = subprocess.run(
             ["lsblk", "-J", "-o", "NAME,SIZE,MODEL,TYPE,TRAN,RM,PATH", "-d"],
             capture_output=True, text=True,
@@ -75,6 +112,8 @@ def get_disks():
             if d.get("type") != "disk" or d.get("name", "").startswith("loop"):
                 continue
             path = d.get("path") or f"/dev/{d.get('name', '')}"
+            if path in excluded:
+                continue
             model = (d.get("model") or "").strip()
             disks.append({
                 "path": path,
@@ -211,17 +250,43 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", len(body))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
 
-    def do_OPTIONS(self):
-        self.send_json({})
+    def send_installer_page(self):
+        """Serve the installer UI with the current token embedded."""
+        try:
+            with open(INSTALLER_HTML) as f:
+                page = f.read().replace("__KIOSK_TOKEN__", read_token())
+        except OSError as e:
+            self.send_json({"error": f"installer UI missing: {e}"}, 500)
+            return
+        body = page.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", len(body))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def request_is_authorized(self):
+        """Reject anything that is not the locally served installer page.
+
+        Without this, any site loaded in the kiosk browser could POST to this
+        API and wipe the disk — a form or fetch() needs no preflight.
+        """
+        origin = self.headers.get("Origin")
+        if origin is not None and origin not in ALLOWED_ORIGINS:
+            return False
+        token = read_token()
+        return bool(token) and self.headers.get("X-Kiosk-Token", "") == token
 
     def do_GET(self):
-        if self.path == "/disks":
+        if self.path in ("/", "/index.html"):
+            self.send_installer_page()
+        elif self.path == "/health":
+            self.send_json({"status": "ok"})
+        elif self.path == "/disks":
             self.send_json(get_disks())
         elif self.path == "/progress":
             try:
@@ -233,6 +298,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "not found"}, 404)
 
     def do_POST(self):
+        if not self.request_is_authorized():
+            self.send_json({"error": "Forbidden"}, 403)
+            return
+
         try:
             length = int(self.headers.get("Content-Length", 0))
         except (TypeError, ValueError):
@@ -259,6 +328,13 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/skip":
             homepage = read_config_value("homepage", "https://example.com")
             self.send_json({"status": "skipped", "homepage": homepage})
+            # Shut down once the user opts out: the kiosk is about to load a
+            # real website and this API must not outlive the installer UI.
+            try:
+                os.unlink(TOKEN_FILE)
+            except OSError:
+                pass
+            threading.Timer(1.0, lambda: os._exit(0)).start()
 
         elif self.path == "/reboot":
             self.send_json({"status": "rebooting"})
