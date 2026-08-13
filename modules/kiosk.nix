@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ pkgs, ... }:
 
 let
   kioskStartScript = pkgs.writeShellScript "kiosk-start" ''
@@ -30,8 +30,9 @@ let
 
     # Wallpaper
     if [ -n "$WALLPAPER" ]; then
-      ${pkgs.curl}/bin/curl -sL "$WALLPAPER" -o /tmp/wallpaper.jpg 2>/dev/null || true
-      if [ -f /tmp/wallpaper.jpg ]; then
+      ${pkgs.curl}/bin/curl -sL --max-time 10 --connect-timeout 5 \
+        "$WALLPAPER" -o /tmp/wallpaper.jpg 2>/dev/null || true
+      if [ -s /tmp/wallpaper.jpg ]; then
         ${pkgs.swaybg}/bin/swaybg -i /tmp/wallpaper.jpg -m fill &
       fi
     elif [ -f /etc/kiosk/wallpaper-default.jpg ]; then

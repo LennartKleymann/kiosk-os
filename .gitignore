@@ -4,3 +4,9 @@ result-*
 .envrc
 *.qcow2
 *.iso
+.DS_Store
+__pycache__/
+
+# .NET build output
+bin/
+obj/

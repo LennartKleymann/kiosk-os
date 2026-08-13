@@ -7,6 +7,8 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 1. **USB partition** — If a partition labeled `KIOSK_CFG` exists on the boot drive, the file `kiosk.conf` is read from it
 2. **Remote URL** — If `kiosk_config=` is set, the remote config is fetched and overrides the local config
 
+> **Security note:** `auto_install` is stripped from remote configs. It can only be set via the local USB config to prevent remote configs from triggering disk installations across a fleet.
+
 ## Network
 
 | Parameter | Values | Default | Description |
@@ -15,10 +17,6 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | `dhcp` | `yes`, `no` | `yes` | Use DHCP for IP assignment |
 | `wifi_ssid` | string | — | WiFi network name (required when `connection=wifi`) |
 | `wifi_password` | string | — | WiFi password |
-| `ip` | IP address | — | Static IP (only when `dhcp=no`) |
-| `netmask` | netmask | `255.255.255.0` | Subnet mask |
-| `gateway` | IP address | — | Default gateway |
-| `dns` | IP address | — | DNS server |
 
 ## Browser
 
@@ -27,7 +25,6 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | `homepage` | URL | `https://example.com` | **Required.** The URL shown in the kiosk browser |
 | `browser_mode` | `kiosk`, `fullscreen` | `kiosk` | Browser UI mode (see below) |
 | `whitelist` | domains (pipe-separated) | — | Only allow these domains. All others are blocked |
-| `right_mouse_click` | `yes`, `no` | `yes` | *Planned.* Allow right-click context menu |
 
 ### Browser Modes
 
@@ -45,9 +42,7 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 | Parameter | Values | Default | Description |
 |---|---|---|---|
 | `wallpaper` | URL | — | Wallpaper image URL, downloaded at boot |
-| `hide_mouse` | seconds (integer) | `0` | *Planned.* Hide cursor after N seconds of inactivity |
 | `timezone` | tz string | `Europe/Berlin` | System timezone |
-| `primary_keyboard_layout` | layout code | `us` | *Planned.* Keyboard layout (e.g., `de`, `fr`, `es`) |
 
 ## Power Management
 
@@ -55,34 +50,18 @@ kiosk-os uses a simple `key=value` configuration format. Lines starting with `#`
 |---|---|---|---|
 | `session_idle` | minutes (integer) | `0` | Reset browser session after N minutes of inactivity. `0` = disabled |
 | `dpms_idle` | minutes (integer) | `0` | Turn off display after N minutes of inactivity. `0` = disabled. Any input wakes instantly |
-| `scheduled_action` | see below | — | *Planned.* Execute commands on a schedule |
-
-### Scheduled Actions
-
-Format: `Day-HH:MM action:command`
-
-Multiple days separated by spaces. The command is a shell command.
-
-```ini
-# Shutdown every weekday at 18:00
-scheduled_action=Monday-18:00 Tuesday-18:00 Wednesday-18:00 Thursday-18:00 Friday-18:00 action:shutdown
-
-# Reboot every day at 03:00
-scheduled_action=Monday-03:00 Tuesday-03:00 Wednesday-03:00 Thursday-03:00 Friday-03:00 Saturday-03:00 Sunday-03:00 action:reboot
-```
 
 ## Security
 
 | Parameter | Values | Default | Description |
 |---|---|---|---|
 | `removable_devices` | `yes`, `no` | `yes` | Allow USB mass storage devices. Keyboards and mice always work |
-| `shutdown_menu` | `yes`, `no` | `yes` | Allow Ctrl+Alt+Del shutdown menu |
 
 ## Remote Configuration
 
 | Parameter | Values | Default | Description |
 |---|---|---|---|
-| `kiosk_config` | URL | — | Remote config URL. Fetched on every boot. Overrides local config |
+| `kiosk_config` | URL | — | Remote config URL. Fetched on every boot. Overrides local config. **Must be HTTPS** — plain HTTP is refused, and `auto_install` is stripped from whatever it returns |
 
 ## Installation
 
@@ -104,10 +83,12 @@ After installation, the system boots from the internal disk and goes directly to
 
 The config partition (`KIOSK_CFG`) on the internal disk is a separate FAT32 partition that can be mounted from another system to update the configuration.
 
-## Administration
+## Roadmap
 
-| Parameter | Values | Default | Description |
-|---|---|---|---|
-| `admin_ssh` | `yes`, `no` | `no` | Enable SSH access for remote management |
-| `admin_ssh_key` | SSH public key | — | Authorized SSH key for the admin user |
-| `admin_ssh_port` | port number | `22` | *Planned.* SSH port |
+The following parameters are planned for future releases:
+
+- `hide_mouse` — Hide cursor after N seconds of inactivity
+- `primary_keyboard_layout` — Keyboard layout selection
+- `scheduled_action` — Cron-like scheduled commands (shutdown, reboot, etc.)
+- `static IP configuration` — Static `ip` / `gateway` / `dns` settings
+- `admin_ssh` — Remote SSH access with configurable keys

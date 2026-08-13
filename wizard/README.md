@@ -1,29 +1,57 @@
 # kiosk-os Wizard
 
-> **Status:** Planned — not yet implemented.
+Desktop tool that prepares a kiosk-os USB stick: configure the kiosk on your
+PC, write the stick, take it to the device.
 
-The wizard will be a cross-platform CLI/GUI tool that simplifies kiosk setup:
+This exists because kiosks are often touch-only. Typing a WiFi password on a
+machine with no keyboard is not practical, so the configuration is entered here
+and travels on the stick.
 
-1. Select a USB stick
-2. Configure network (wired/WiFi), homepage, and options interactively
-3. Flash the kiosk-os image with the embedded configuration
+## Status
 
-## Planned Features
+Working towards a first release. Windows and Linux are the supported targets;
+macOS device enumeration exists but the write path is not finished.
 
-- Interactive CLI with arrow-key selection
-- Optional web-based UI (localhost)
-- Auto-detect connected USB drives
-- Cross-platform: macOS, Linux, Windows
-- Single binary (no runtime dependencies)
+## What it does
 
-## Technology
+1. **Configure** — homepage, browser mode, network (wired or WiFi), timezone,
+   domain whitelist, idle timeouts
+2. **Select a stick** — removable devices only, with size and model
+3. **Write** — downloads the ISO from the latest GitHub release (or uses a
+   local file), writes it, verifies it, then drops the generated `kiosk.conf`
+   onto the `KIOSK_CFG` partition
 
-TBD — candidates:
+The kiosk reads that partition on every boot
+(see `modules/config-fetcher.nix`), so the same stick can be reconfigured
+later by editing one text file.
 
-- **Go** + [Bubbletea](https://github.com/charmbracelet/bubbletea) (TUI)
-- **Rust** + [Ratatui](https://github.com/ratatui-org/ratatui) (TUI)
-- **Tauri** (Desktop GUI)
+## Requirements
+
+- .NET 10 SDK
+- Administrator (Windows) or root (Linux) — writing to a raw block device
+  needs elevated rights
+
+## Build and run
+
+```bash
+cd wizard/KioskOsWizard
+dotnet run
+```
+
+## Architecture
+
+Avalonia with MVVM (CommunityToolkit.Mvvm). Platform differences live behind
+interfaces resolved at runtime:
+
+| Piece | Purpose |
+|---|---|
+| `Models/KioskConfig.cs` | Serializes to the `key=value` format the kiosk parses |
+| `Services/IUsbService.cs` | Device enumeration, one implementation per OS |
+| `Services/FlashService.cs` | Raw block writes with progress and verification |
+| `Services/GithubReleaseService.cs` | Release lookup and ISO download |
+| `ViewModels/` | One per wizard step, orchestrated by `MainWindowViewModel` |
 
 ## Contributing
 
-If you'd like to help build the wizard, check the [issues](../../issues) labeled `wizard`.
+macOS support and code signing are the two open areas. See the
+[issues](../../issues) labeled `wizard`.

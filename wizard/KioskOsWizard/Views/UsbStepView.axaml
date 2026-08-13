@@ -1,0 +1,139 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:KioskOsWizard.ViewModels"
+             x:DataType="vm:UsbStepViewModel"
+             x:Class="KioskOsWizard.Views.UsbStepView">
+    <StackPanel Spacing="20" MaxWidth="600">
+
+        <!-- Image Source -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="kiosk-os image" Foreground="White" FontWeight="SemiBold"/>
+
+            <RadioButton Content="Download latest release" GroupName="Source"
+                         IsChecked="{Binding UseLatestRelease}"
+                         Foreground="#ddd"/>
+
+            <!-- Latest release info + download -->
+            <Border Margin="24,4,0,0" Padding="12" Background="#1a1a2e"
+                    BorderBrush="#2a2a3e" BorderThickness="1" CornerRadius="6"
+                    IsVisible="{Binding UseLatestRelease}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding ReleaseStatus}" Foreground="#ddd" FontSize="13"/>
+
+                    <!-- Download button -->
+                    <Button Content="Download"
+                            Command="{Binding DownloadLatestCommand}"
+                            Padding="14,6" HorizontalAlignment="Left"
+                            Background="#6366f1" Foreground="White"
+                            BorderBrush="#6366f1">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="LatestRelease" Converter="{x:Static ObjectConverters.IsNotNull}"/>
+                                <Binding Path="CachedIsoPath" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
+                            </MultiBinding>
+                        </Button.IsVisible>
+                    </Button>
+
+                    <!-- Download progress -->
+                    <StackPanel Spacing="4" IsVisible="{Binding IsDownloading}">
+                        <TextBlock Text="{Binding DownloadStatus}" Foreground="#aaa" FontSize="12"/>
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding DownloadPercent}"
+                                     Height="4" Foreground="#6366f1" Background="#0f0f1a"/>
+                    </StackPanel>
+
+                    <!-- Download done -->
+                    <TextBlock Text="✓ Ready to flash" Foreground="#22c55e" FontSize="12">
+                        <TextBlock.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsDownloading"/>
+                                <Binding Path="CachedIsoPath" Converter="{x:Static StringConverters.IsNotNullOrEmpty}"/>
+                            </MultiBinding>
+                        </TextBlock.IsVisible>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <RadioButton Content="Use local ISO file" GroupName="Source"
+                         IsChecked="{Binding !UseLatestRelease}"
+                         Foreground="#ddd" Margin="0,4,0,0"/>
+
+            <!-- Local file picker -->
+            <Grid Margin="24,4,0,0" ColumnDefinitions="*,Auto"
+                  IsVisible="{Binding !UseLatestRelease}">
+                <TextBox Grid.Column="0" Text="{Binding CustomIsoPath}"
+                         Watermark="Path to kiosk-os.iso"
+                         Background="#1a1a2e" Foreground="White"
+                         BorderBrush="#2a2a3e" Padding="10,8"
+                         Margin="0,0,8,0"/>
+                <Button Grid.Column="1" Content="Browse..."
+                        Name="BrowseButton" Click="OnBrowseClick"
+                        Padding="16,8"
+                        Background="#1a1a2e" Foreground="#ddd"
+                        BorderBrush="#2a2a3e"/>
+            </Grid>
+        </StackPanel>
+
+        <!-- USB Devices -->
+        <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="USB stick" Foreground="White" FontWeight="SemiBold"/>
+                <Button Grid.Column="1" Content="↻ Refresh"
+                        Command="{Binding RefreshUsbCommand}"
+                        Background="Transparent" Foreground="#6366f1"
+                        BorderBrush="Transparent" Padding="8,2"/>
+            </Grid>
+            <TextBlock Text="All data on the selected device will be erased"
+                       Foreground="#f59e0b" FontSize="12"/>
+
+            <Border Background="#1a1a2e" BorderBrush="#2a2a3e"
+                    BorderThickness="1" CornerRadius="8" MinHeight="120">
+                <Panel>
+                    <TextBlock Text="Scanning for USB devices..."
+                               Foreground="#666" HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsScanning}"/>
+
+                    <TextBlock Text="No USB devices found. Insert a USB stick and click Refresh."
+                               Foreground="#666" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" TextWrapping="Wrap"
+                               Margin="24" TextAlignment="Center">
+                        <TextBlock.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsScanning"/>
+                                <Binding Path="Devices.Count" Converter="{x:Static ObjectConverters.Equal}" ConverterParameter="0"/>
+                            </MultiBinding>
+                        </TextBlock.IsVisible>
+                    </TextBlock>
+
+                    <ListBox ItemsSource="{Binding Devices}"
+                             SelectedItem="{Binding SelectedDevice}"
+                             Background="Transparent" BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="4">
+                                    <TextBlock Text="{Binding Model}" Foreground="White" FontWeight="SemiBold"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <TextBlock Text="{Binding SizeFormatted}" Foreground="#888" FontSize="12"/>
+                                        <TextBlock Text="{Binding Path}" Foreground="#888" FontSize="12"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Panel>
+            </Border>
+
+            <Border Background="#2a1a1a" BorderBrush="#7a3a3a" BorderThickness="1"
+                    CornerRadius="8" Padding="12" Margin="0,8,0,0"
+                    IsVisible="{Binding DeviceWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="⚠  This stick cannot be written to"
+                               FontWeight="SemiBold" Foreground="#f59e0b"/>
+                    <TextBlock Text="{Binding DeviceWarning}" TextWrapping="Wrap"
+                               Foreground="#e0cccc" LineHeight="18"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

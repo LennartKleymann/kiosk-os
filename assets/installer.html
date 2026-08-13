@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="kiosk-token" content="__KIOSK_TOKEN__">
     <title>kiosk-os — Install</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -380,8 +381,17 @@
     </div>
 
     <script>
-        const API = 'http://localhost:8484';
+        const API = '';
+        const TOKEN = document.querySelector('meta[name="kiosk-token"]')?.content || '';
         let selectedDisk = null;
+
+        function post(path, body) {
+            return fetch(`${API}${path}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Kiosk-Token': TOKEN },
+                body: body === undefined ? undefined : JSON.stringify(body),
+            });
+        }
 
         async function loadDisks() {
             try {
@@ -394,30 +404,59 @@
             }
         }
 
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+
         function renderDisks(disks) {
             const list = document.getElementById('disk-list');
+            list.innerHTML = '';
 
             if (disks.length === 0) {
-                list.innerHTML = '<p style="text-align:center;color:#555;padding:2rem;">No suitable disks found.</p>';
+                const p = document.createElement('p');
+                p.style.cssText = 'text-align:center;color:#555;padding:2rem;';
+                p.textContent = 'No suitable disks found.';
+                list.appendChild(p);
                 return;
             }
 
-            list.innerHTML = disks.map(d => {
+            disks.forEach(d => {
                 const path = d.path || '/dev/???';
                 const model = d.model && d.model !== 'null' ? d.model : path;
                 const size = d.size && d.size !== 'null' ? d.size : 'Unknown size';
                 const transport = d.transport && d.transport !== 'null' ? d.transport : '';
-                return `
-                <div class="disk-card" onclick="selectDisk(this, '${path}')" data-path="${path}">
-                    <div class="disk-name">${model}</div>
-                    <div class="disk-info">
-                        <span>${size}</span>
-                        <span>${path}</span>
-                        <span>${transport}</span>
-                    </div>
-                    ${d.removable ? '<div class="disk-warning">&#9888; This appears to be a removable device</div>' : ''}
-                </div>
-            `}).join('');
+
+                const card = document.createElement('div');
+                card.className = 'disk-card';
+                card.dataset.path = path;
+                card.addEventListener('click', () => selectDisk(card, path));
+
+                const name = document.createElement('div');
+                name.className = 'disk-name';
+                name.textContent = model;
+                card.appendChild(name);
+
+                const info = document.createElement('div');
+                info.className = 'disk-info';
+                [size, path, transport].forEach(text => {
+                    if (!text) return;
+                    const span = document.createElement('span');
+                    span.textContent = text;
+                    info.appendChild(span);
+                });
+                card.appendChild(info);
+
+                if (d.removable) {
+                    const warn = document.createElement('div');
+                    warn.className = 'disk-warning';
+                    warn.textContent = '⚠ This appears to be a removable device';
+                    card.appendChild(warn);
+                }
+
+                list.appendChild(card);
+            });
         }
 
         function selectDisk(el, path) {
@@ -444,11 +483,7 @@
             showStep('step-install');
 
             try {
-                const res = await fetch(`${API}/install`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ disk: selectedDisk })
-                });
+                const res = await post('/install', { disk: selectedDisk });
 
                 if (!res.ok) throw new Error(await res.text());
 
@@ -500,7 +535,7 @@
 
         async function skipInstall() {
             try {
-                const res = await fetch(`${API}/skip`, { method: 'POST' });
+                const res = await post('/skip');
                 const data = await res.json();
                 if (data.homepage) {
                     window.location.href = data.homepage;
@@ -513,7 +548,7 @@
 
         async function reboot() {
             try {
-                await fetch(`${API}/reboot`, { method: 'POST' });
+                await post('/reboot');
             } catch (e) {}
         }
 

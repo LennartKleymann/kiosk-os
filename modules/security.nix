@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ ... }:
 
 {
   # Disable virtual consoles and Ctrl+Alt+Del

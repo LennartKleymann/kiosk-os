@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:KioskOsWizard.ViewModels"
+             x:DataType="vm:WelcomeStepViewModel"
+             x:Class="KioskOsWizard.Views.WelcomeStepView">
+    <StackPanel Spacing="16" MaxWidth="560">
+        <TextBlock Text="Set up a new kiosk"
+                   FontSize="24" FontWeight="SemiBold"
+                   Foreground="White"/>
+        <TextBlock TextWrapping="Wrap" Foreground="#bbb" LineHeight="22"
+                   Text="This wizard will guide you through creating a bootable kiosk-os USB stick. The process takes about 3–5 minutes."/>
+
+        <StackPanel Spacing="12" Margin="0,16,0,0">
+            <TextBlock Text="What you'll need:" FontWeight="SemiBold" Foreground="White"/>
+            <TextBlock Foreground="#aaa" Text="• A USB stick (8 GB minimum)"/>
+            <TextBlock Foreground="#aaa" Text="• The kiosk-os ISO file (download at github.com/LennartKleymann/kiosk-os)"/>
+            <TextBlock Foreground="#aaa" Text="• The URL you want to show on the kiosk"/>
+        </StackPanel>
+
+        <Border Background="#2a1a1a" BorderBrush="#7a3a3a" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,16,0,0"
+                IsVisible="{Binding !HasPrivileges}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="⚠  Not running with the required permissions"
+                           FontWeight="SemiBold" Foreground="#f59e0b"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#e0cccc" LineHeight="20"
+                           Text="{Binding PrivilegeMessage}"/>
+                <Button Content="Restart as administrator"
+                        Command="{Binding RestartElevatedCommand}"
+                        IsVisible="{Binding CanRestartElevated}"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <Border Background="#152a1e" BorderBrush="#2f6b45" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,16,0,0"
+                IsVisible="{Binding HasPrivileges}">
+            <StackPanel Spacing="4">
+                <TextBlock Text="✓  Ready to write" FontWeight="SemiBold" Foreground="#4ade80"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#c0d8c8" LineHeight="20"
+                           Text="{Binding PrivilegeMessage}"/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
