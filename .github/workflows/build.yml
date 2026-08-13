@@ -72,7 +72,9 @@ jobs:
         with:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          files: publish/${{ matrix.runtime }}/KioskOsWizard*
+          files: |
+            publish/${{ matrix.runtime }}/KioskOsWizard
+            publish/${{ matrix.runtime }}/KioskOsWizard.exe
 
   build:
     runs-on: ubuntu-latest
