@@ -52,6 +52,35 @@ public class FlashService
         }
     }
 
+    /// <summary>
+    /// Opens the device for writing and closes it again without writing
+    /// anything. Being an administrator does not guarantee this particular
+    /// device can be opened, and finding that out after the configuration is
+    /// done and the image is downloaded is the worst possible moment.
+    /// Returns null when the device is writable, otherwise the reason.
+    /// </summary>
+    public string? CheckWritable(string devicePath)
+    {
+        try
+        {
+            using var probe = _device.OpenWrite(devicePath);
+            WizardLog.Info($"Write probe on {devicePath} succeeded");
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            WizardLog.Error($"Write probe on {devicePath}: access denied");
+            return OperatingSystem.IsWindows()
+                ? "Access denied. Restart the wizard as administrator."
+                : "Access denied. Start the wizard with pkexec or sudo.";
+        }
+        catch (Exception ex)
+        {
+            WizardLog.Error($"Write probe on {devicePath} failed", ex);
+            return ex.Message;
+        }
+    }
+
     public async Task FlashAsync(
         string isoPath,
         string devicePath,

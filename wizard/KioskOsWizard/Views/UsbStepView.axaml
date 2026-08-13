@@ -123,6 +123,17 @@
                     </ListBox>
                 </Panel>
             </Border>
+
+            <Border Background="#2a1a1a" BorderBrush="#7a3a3a" BorderThickness="1"
+                    CornerRadius="8" Padding="12" Margin="0,8,0,0"
+                    IsVisible="{Binding DeviceWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="⚠  This stick cannot be written to"
+                               FontWeight="SemiBold" Foreground="#f59e0b"/>
+                    <TextBlock Text="{Binding DeviceWarning}" TextWrapping="Wrap"
+                               Foreground="#e0cccc" LineHeight="18"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </StackPanel>
 </UserControl>

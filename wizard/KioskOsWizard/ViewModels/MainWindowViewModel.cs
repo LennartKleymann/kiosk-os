@@ -33,9 +33,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _steps = new List<StepViewModel>
         {
-            new WelcomeStepViewModel(_config),
+            new WelcomeStepViewModel(_config, flashService),
             new ConfigStepViewModel(_config),
-            new UsbStepViewModel(_config, usbService, githubService),
+            new UsbStepViewModel(_config, usbService, githubService, flashService),
             new FlashStepViewModel(_config, flashService, configWriter),
         };
 

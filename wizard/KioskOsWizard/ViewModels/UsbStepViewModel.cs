@@ -14,6 +14,7 @@ public partial class UsbStepViewModel : StepViewModel
 {
     private readonly IUsbService _usbService;
     private readonly GithubReleaseService _githubService;
+    private readonly FlashService _flashService;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty]
@@ -51,18 +52,37 @@ public partial class UsbStepViewModel : StepViewModel
     [ObservableProperty]
     private string? _cachedIsoPath;
 
-    public UsbStepViewModel(KioskConfig config, IUsbService usbService, GithubReleaseService githubService) : base(config)
+    [ObservableProperty]
+    private string? _deviceWarning;
+
+    public UsbStepViewModel(
+        KioskConfig config,
+        IUsbService usbService,
+        GithubReleaseService githubService,
+        FlashService flashService) : base(config)
     {
         Title = "Select image and USB stick";
         _usbService = usbService;
         _githubService = githubService;
+        _flashService = flashService;
+    }
+
+    /// <summary>
+    /// Probes the device as soon as it is picked, so a permission problem
+    /// surfaces here rather than after the image has been downloaded.
+    /// </summary>
+    partial void OnSelectedDeviceChanged(UsbDevice? value)
+    {
+        DeviceWarning = value is null ? null : _flashService.CheckWritable(value.Path);
+        OnPropertyChanged(nameof(CanProceed));
     }
 
     public string ResolvedIsoPath =>
         UseLatestRelease ? (CachedIsoPath ?? "") : CustomIsoPath;
 
     public override bool CanProceed =>
-        SelectedDevice != null && !string.IsNullOrEmpty(ResolvedIsoPath) && File.Exists(ResolvedIsoPath);
+        SelectedDevice != null && DeviceWarning is null
+        && !string.IsNullOrEmpty(ResolvedIsoPath) && File.Exists(ResolvedIsoPath);
 
     public override async void OnEntered()
     {
@@ -165,7 +185,6 @@ public partial class UsbStepViewModel : StepViewModel
             : $"{bytes / (double)MB:F0} MB";
     }
 
-    partial void OnSelectedDeviceChanged(UsbDevice? value) => OnPropertyChanged(nameof(CanProceed));
     partial void OnCustomIsoPathChanged(string value) => OnPropertyChanged(nameof(CanProceed));
     partial void OnUseLatestReleaseChanged(bool value) => OnPropertyChanged(nameof(CanProceed));
     partial void OnCachedIsoPathChanged(string? value) => OnPropertyChanged(nameof(CanProceed));

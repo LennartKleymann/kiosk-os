@@ -17,13 +17,28 @@
             <TextBlock Foreground="#aaa" Text="• The URL you want to show on the kiosk"/>
         </StackPanel>
 
-        <Border Background="#1e1e38" BorderBrush="#3a3a5e" BorderThickness="1"
-                CornerRadius="8" Padding="16" Margin="0,16,0,0">
-            <StackPanel Spacing="4">
-                <TextBlock Text="⚠  Administrator privileges required"
+        <Border Background="#2a1a1a" BorderBrush="#7a3a3a" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,16,0,0"
+                IsVisible="{Binding !HasPrivileges}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="⚠  Not running with the required permissions"
                            FontWeight="SemiBold" Foreground="#f59e0b"/>
-                <TextBlock TextWrapping="Wrap" Foreground="#cca0a0"
-                           Text="Writing to a USB stick requires elevated permissions. You may be prompted for your password during the flashing step."/>
+                <TextBlock TextWrapping="Wrap" Foreground="#e0cccc" LineHeight="20"
+                           Text="{Binding PrivilegeMessage}"/>
+                <Button Content="Restart as administrator"
+                        Command="{Binding RestartElevatedCommand}"
+                        IsVisible="{Binding CanRestartElevated}"
+                        HorizontalAlignment="Left" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <Border Background="#152a1e" BorderBrush="#2f6b45" BorderThickness="1"
+                CornerRadius="8" Padding="16" Margin="0,16,0,0"
+                IsVisible="{Binding HasPrivileges}">
+            <StackPanel Spacing="4">
+                <TextBlock Text="✓  Ready to write" FontWeight="SemiBold" Foreground="#4ade80"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#c0d8c8" LineHeight="20"
+                           Text="{Binding PrivilegeMessage}"/>
             </StackPanel>
         </Border>
     </StackPanel>
