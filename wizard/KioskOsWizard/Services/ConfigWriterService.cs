@@ -97,7 +97,7 @@ public class ConfigWriterService
     /// </summary>
     private static async Task<string?> FindOnWindowsAsync(string? devicePath, CancellationToken cancellationToken)
     {
-        var diskNumber = devicePath is null ? null : WindowsDeviceAccess.ExtractDiskNumber(devicePath);
+        var diskNumber = devicePath is null ? null : DevicePaths.ExtractDiskNumber(devicePath);
 
         var source = diskNumber is null
             ? $"Get-Volume -FileSystemLabel {PartitionLabel} -ErrorAction SilentlyContinue"
@@ -148,7 +148,7 @@ public class ConfigWriterService
 
     private static async Task AssignDriveLetterAsync(string devicePath, CancellationToken cancellationToken)
     {
-        var diskNumber = WindowsDeviceAccess.ExtractDiskNumber(devicePath);
+        var diskNumber = DevicePaths.ExtractDiskNumber(devicePath);
         if (diskNumber is null) return;
 
         WizardLog.Info($"No drive letter for {PartitionLabel}, requesting one on disk {diskNumber}");

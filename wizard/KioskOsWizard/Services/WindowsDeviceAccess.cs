@@ -5,7 +5,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Principal;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -161,7 +160,7 @@ public class WindowsDeviceAccess : IDeviceAccess
     private static async Task<IReadOnlyList<string>> GetVolumeLettersAsync(
         string devicePath, CancellationToken cancellationToken)
     {
-        var diskNumber = ExtractDiskNumber(devicePath);
+        var diskNumber = DevicePaths.ExtractDiskNumber(devicePath);
         if (diskNumber is null) return Array.Empty<string>();
 
         var script =
@@ -190,15 +189,6 @@ public class WindowsDeviceAccess : IDeviceAccess
         }
 
         return letters;
-    }
-
-    internal static int? ExtractDiskNumber(string devicePath)
-    {
-        var digits = new StringBuilder();
-        for (var i = devicePath.Length - 1; i >= 0 && char.IsDigit(devicePath[i]); i--)
-            digits.Insert(0, devicePath[i]);
-
-        return digits.Length > 0 && int.TryParse(digits.ToString(), out var n) ? n : null;
     }
 
     private static async Task<string> RunPowerShellAsync(string script, CancellationToken cancellationToken)
