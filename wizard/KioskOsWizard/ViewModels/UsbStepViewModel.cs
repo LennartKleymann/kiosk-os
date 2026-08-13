@@ -104,8 +104,8 @@ public partial class UsbStepViewModel : StepViewModel
             ReleaseStatus = $"{release.Name} ({FormatBytes(release.Size)})";
 
             // Check if we already have it cached
-            var cacheDir = GetCacheDir();
-            var cachedPath = Path.Combine(cacheDir, $"kiosk-os-{release.TagName}.iso");
+            var cachedPath = Path.Combine(
+                GithubReleaseService.CacheDirectory, $"kiosk-os-{release.TagName}.iso");
             if (File.Exists(cachedPath) && new FileInfo(cachedPath).Length == release.Size)
             {
                 CachedIsoPath = cachedPath;
@@ -128,13 +128,8 @@ public partial class UsbStepViewModel : StepViewModel
         _downloadCts = new CancellationTokenSource();
         try
         {
-            var cacheDir = GetCacheDir();
-            Directory.CreateDirectory(cacheDir);
-            var path = Path.Combine(cacheDir, $"kiosk-os-{LatestRelease.TagName}.iso");
-
-            await _githubService.DownloadAsync(
+            var path = await _githubService.GetOrDownloadAsync(
                 LatestRelease,
-                path,
                 (written, total) =>
                 {
                     var pct = total > 0 ? (double)written / total * 100 : 0;
@@ -144,7 +139,7 @@ public partial class UsbStepViewModel : StepViewModel
                 _downloadCts.Token);
 
             CachedIsoPath = path;
-            DownloadStatus = "Download complete";
+            DownloadStatus = "Download complete and verified";
             OnPropertyChanged(nameof(CanProceed));
         }
         catch (OperationCanceledException)
@@ -159,12 +154,6 @@ public partial class UsbStepViewModel : StepViewModel
         {
             IsDownloading = false;
         }
-    }
-
-    private static string GetCacheDir()
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        return Path.Combine(home, ".cache", "kiosk-os-wizard");
     }
 
     private static string FormatBytes(long bytes)

@@ -84,7 +84,7 @@
       cfgSizeMiB = 16;
       alignMiB = 1;
     in pkgs.runCommand "kiosk-os-iso" {
-      nativeBuildInputs = with pkgs; [ gptfdisk dosfstools util-linux coreutils ];
+      nativeBuildInputs = with pkgs; [ dosfstools util-linux coreutils jq ];
     } ''
       mkdir -p $out/iso
       iso=$out/iso/kiosk-os.iso
@@ -94,33 +94,31 @@
       truncate -s ${toString cfgSizeMiB}M cfg.img
       mkfs.vfat -F 16 -n KIOSK_CFG cfg.img
 
-      # Grow the image, then move the backup GPT to the new end before adding
-      # the entry — sgdisk refuses to place a partition past a stale header.
+      # The image carries an isohybrid MBR from syslinux, not a GPT, so the
+      # entry goes into a free MBR slot. sfdisk only rewrites the partition
+      # table at bytes 446..510 and leaves the boot code before it intact.
+      sectors=$(( ${toString cfgSizeMiB} * 1024 * 1024 / 512 ))
+      align=$(( ${toString alignMiB} * 1024 * 1024 / 512 ))
+
       truncate -s +$(( (${toString cfgSizeMiB} + ${toString alignMiB} * 2) * 1024 * 1024 )) $iso
-      sgdisk --move-second-header $iso
 
-      # Partition number 0 tells sgdisk to pick the next free slot itself.
-      sgdisk --largest-new=0 --typecode=0:0700 --change-name=0:KIOSK_CFG $iso
+      lastEnd=$(sfdisk --json $iso | jq '[.partitiontable.partitions[] | .start + .size] | max')
+      start=$(( (lastEnd + align - 1) / align * align ))
 
-      part=$(sgdisk --print $iso | awk '$NF == "KIOSK_CFG" { print $1 }')
-      if [ -z "$part" ]; then
-        echo "config partition was not created" >&2
-        exit 1
-      fi
-      start=$(sgdisk --info=$part $iso | awk '/First sector/ { print $3 }')
+      echo "$start,$sectors,0xe" | sfdisk --append --no-reread --no-tell-kernel $iso
 
       dd if=cfg.img of=$iso bs=512 seek=$start conv=notrunc status=none
 
       # The label is what the kiosk mounts by, so a silent failure here would
-      # only surface as a kiosk ignoring its config.
+      # only surface later as a kiosk ignoring its configuration.
       found=$(blkid -p -o value -s LABEL -O $(( start * 512 )) $iso || true)
       if [ "$found" != "KIOSK_CFG" ]; then
         echo "expected label KIOSK_CFG at sector $start, got: $found" >&2
         exit 1
       fi
 
-      echo "Config partition $part at sector $start:"
-      sgdisk --print $iso
+      echo "Config partition at sector $start:"
+      sfdisk --list $iso
     '';
   in {
     nixosConfigurations = {
