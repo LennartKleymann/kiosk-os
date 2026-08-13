@@ -82,42 +82,15 @@
     withConfigPartition = buildSystem: let
       pkgs = nixpkgs.legacyPackages.${buildSystem};
       cfgSizeMiB = 16;
-      alignMiB = 1;
     in pkgs.runCommand "kiosk-os-iso" {
-      nativeBuildInputs = with pkgs; [ dosfstools util-linux coreutils jq ];
+      nativeBuildInputs = with pkgs; [ bash dosfstools util-linux coreutils jq ];
     } ''
       mkdir -p $out/iso
       iso=$out/iso/kiosk-os.iso
       cp ${plainIso}/iso/kiosk-os.iso $iso
       chmod +w $iso
 
-      truncate -s ${toString cfgSizeMiB}M cfg.img
-      mkfs.vfat -F 16 -n KIOSK_CFG cfg.img
-
-      # The image carries an isohybrid MBR from syslinux, not a GPT, so the
-      # entry goes into a free MBR slot. sfdisk only rewrites the partition
-      # table at bytes 446..510 and leaves the boot code before it intact.
-      sectors=$(( ${toString cfgSizeMiB} * 1024 * 1024 / 512 ))
-      align=$(( ${toString alignMiB} * 1024 * 1024 / 512 ))
-
-      truncate -s +$(( (${toString cfgSizeMiB} + ${toString alignMiB} * 2) * 1024 * 1024 )) $iso
-
-      lastEnd=$(sfdisk --json $iso | jq '[.partitiontable.partitions[] | .start + .size] | max')
-      start=$(( (lastEnd + align - 1) / align * align ))
-
-      echo "$start,$sectors,0xe" | sfdisk --append --no-reread --no-tell-kernel $iso
-
-      dd if=cfg.img of=$iso bs=512 seek=$start conv=notrunc status=none
-
-      # The label is what the kiosk mounts by, so a silent failure here would
-      # only surface later as a kiosk ignoring its configuration.
-      found=$(blkid -p -o value -s LABEL -O $(( start * 512 )) $iso || true)
-      if [ "$found" != "KIOSK_CFG" ]; then
-        echo "expected label KIOSK_CFG at sector $start, got: $found" >&2
-        exit 1
-      fi
-
-      echo "Config partition at sector $start:"
+      bash ${./scripts/append-config-partition.sh} $iso ${toString cfgSizeMiB}
       sfdisk --list $iso
     '';
   in {
