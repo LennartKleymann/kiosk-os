@@ -98,7 +98,8 @@ public partial class FlashStepViewModel : StepViewModel
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Flashing failed: {ex.Message}";
+            WizardLog.Error($"Flashing {DevicePath} failed", ex);
+            ErrorMessage = $"Flashing failed: {ex.Message}\n\nDetails in {WizardLog.FilePath}";
         }
         finally
         {
