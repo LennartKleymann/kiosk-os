@@ -128,4 +128,80 @@ public class KioskConfigTests
 
         Assert.Empty(offending);
     }
+
+    [Fact]
+    public void Line_endings_are_lf_on_every_platform()
+    {
+        // The kiosk's shell parsers would keep a trailing \r on every value.
+        var content = new KioskConfig { SessionIdleMinutes = 10 }.ToConfigFileContent();
+        Assert.DoesNotContain("\r", content);
+        Assert.EndsWith("\n", content);
+    }
+
+    [Fact]
+    public void Line_breaks_inside_values_cannot_inject_keys()
+    {
+        var content = new KioskConfig
+        {
+            Homepage = "https://example.com\r\nauto_install=yes",
+            Connection = ConnectionType.Wifi,
+            WifiSsid = "Net\nkiosk_config=https://evil.example",
+            WifiPassword = "password1",
+        }.ToConfigFileContent();
+
+        Assert.Null(ReadValue(content, "auto_install"));
+        Assert.Null(ReadValue(content, "kiosk_config"));
+    }
+
+    [Theory]
+    [InlineData("", true)]                     // open network
+    [InlineData("password", true)]             // 8 characters
+    [InlineData("short", false)]               // wpa_passphrase rejects < 8
+    [InlineData("0123456789012345678901234567890123456789012345678901234567890123", false)] // 64
+    public void Wifi_password_length_is_validated(string password, bool valid)
+    {
+        var config = new KioskConfig
+        {
+            Connection = ConnectionType.Wifi,
+            WifiSsid = "Net",
+            WifiPassword = password,
+        };
+        Assert.Equal(valid, config.Validate().Count == 0);
+    }
+
+    [Fact]
+    public void Install_option_in_the_wizard_reaches_the_config_file()
+    {
+        var config = new KioskConfig();
+        var step = new KioskOsWizard.ViewModels.ConfigStepViewModel(config)
+        {
+            InstallToDisk = true,
+            UseWifi = true,
+            WifiSsid = "KioskNet",
+            WifiPassword = "supersecret",
+            Timezone = "America/Chicago",
+        };
+        Assert.True(step.CanProceed);
+        step.OnLeaving();
+
+        var content = config.ToConfigFileContent();
+        Assert.Equal("yes", ReadValue(content, "auto_install"));
+        Assert.Equal("wifi", ReadValue(content, "connection"));
+        Assert.Equal("KioskNet", ReadValue(content, "wifi_ssid"));
+        Assert.Equal("supersecret", ReadValue(content, "wifi_password"));
+        Assert.Equal("America/Chicago", ReadValue(content, "timezone"));
+    }
+
+    [Fact]
+    public void Wizard_blocks_an_unusable_wifi_password()
+    {
+        var step = new KioskOsWizard.ViewModels.ConfigStepViewModel(new KioskConfig())
+        {
+            UseWifi = true,
+            WifiSsid = "KioskNet",
+            WifiPassword = "short",
+        };
+        Assert.False(step.CanProceed);
+        Assert.NotNull(step.ValidationMessage);
+    }
 }

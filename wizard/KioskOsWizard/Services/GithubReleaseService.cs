@@ -30,11 +30,28 @@ public class GithubReleaseService
         return h;
     }
 
+    /// <summary>
+    /// Newest stable release with an ISO, or the newest pre-release when there
+    /// is no stable one yet. GitHub's /releases/latest skips pre-releases and
+    /// answers 404 while a project only has release candidates.
+    /// </summary>
     public async Task<KioskOsRelease?> GetLatestReleaseAsync(CancellationToken ct = default)
     {
-        var json = await Http.GetStringAsync($"{ApiUrl}/latest", ct);
+        var json = await Http.GetStringAsync(ApiUrl, ct);
         using var doc = JsonDocument.Parse(json);
-        return ParseRelease(doc.RootElement);
+
+        KioskOsRelease? newestPrerelease = null;
+        foreach (var e in doc.RootElement.EnumerateArray())   // newest first
+        {
+            if (e.TryGetProperty("draft", out var d) && d.ValueKind == JsonValueKind.True) continue;
+            var release = ParseRelease(e);
+            if (release is null) continue;
+
+            var pre = e.TryGetProperty("prerelease", out var p) && p.ValueKind == JsonValueKind.True;
+            if (!pre) return release;
+            newestPrerelease ??= release;
+        }
+        return newestPrerelease;
     }
 
     public async Task<IReadOnlyList<KioskOsRelease>> GetAllReleasesAsync(CancellationToken ct = default)

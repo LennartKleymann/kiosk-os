@@ -42,6 +42,10 @@ public class ConfigWriterService
         var readBack = await File.ReadAllTextAsync(target, cancellationToken);
         if (readBack.Trim() != content.Trim())
             throw new IOException("The configuration did not survive being written to the stick.");
+
+        // Linux caches the write; the user pulls the stick right after "Done".
+        if (OperatingSystem.IsLinux())
+            await RunAsync("sync", string.Empty, cancellationToken);
     }
 
     private async Task<string?> WaitForPartitionAsync(string? devicePath, CancellationToken cancellationToken)
@@ -79,7 +83,7 @@ public class ConfigWriterService
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return FindOnWindowsAsync(devicePath, cancellationToken);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            return FindOnLinuxAsync(cancellationToken);
+            return FindOnLinuxAsync(devicePath, cancellationToken);
 
         throw new PlatformNotSupportedException(
             $"Writing the config is not supported on {RuntimeInformation.OSDescription} yet.");
@@ -161,10 +165,12 @@ public class ConfigWriterService
         await RunAsync("powershell", $"-NoProfile -Command \"{script}\"", cancellationToken);
     }
 
-    private static async Task<string?> FindOnLinuxAsync(CancellationToken cancellationToken)
+    private static async Task<string?> FindOnLinuxAsync(string? devicePath, CancellationToken cancellationToken)
     {
-        var device = $"/dev/disk/by-label/{PartitionLabel}";
-        if (!File.Exists(device)) return null;
+        var device = devicePath is null
+            ? $"/dev/disk/by-label/{PartitionLabel}"
+            : await FindLabelledPartitionAsync(devicePath, cancellationToken);
+        if (device is null || !File.Exists(device)) return null;
 
         var mounted = await RunAsync("findmnt", $"-n -o TARGET {device}", cancellationToken);
         if (!string.IsNullOrWhiteSpace(mounted))
@@ -180,7 +186,40 @@ public class ConfigWriterService
             return output[(index + marker.Length)..].Trim().TrimEnd('.');
 
         mounted = await RunAsync("findmnt", $"-n -o TARGET {device}", cancellationToken);
-        return string.IsNullOrWhiteSpace(mounted) ? null : mounted.Trim();
+        if (!string.IsNullOrWhiteSpace(mounted))
+            return mounted.Trim();
+
+        // No udisks (servers, minimal desktops): the wizard runs as root
+        // anyway, so mount the partition itself.
+        if (Environment.IsPrivilegedProcess)
+        {
+            var mountPoint = Path.Combine(Path.GetTempPath(), "kiosk-os-wizard-cfg");
+            Directory.CreateDirectory(mountPoint);
+            await RunAsync("mount", $"{device} {mountPoint}", cancellationToken);
+            mounted = await RunAsync("findmnt", $"-n -o TARGET {device}", cancellationToken);
+            if (!string.IsNullOrWhiteSpace(mounted))
+                return mounted.Trim();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The KIOSK_CFG partition on the device that was just written. Looking it
+    /// up by label alone would also match another kiosk stick or an installed
+    /// kiosk disk in the same machine.
+    /// </summary>
+    private static async Task<string?> FindLabelledPartitionAsync(string devicePath, CancellationToken cancellationToken)
+    {
+        await RunAsync("udevadm", "settle", cancellationToken);
+        var output = await RunAsync("lsblk", $"-lnpo NAME,LABEL {devicePath}", cancellationToken);
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length == 2 && parts[1] == PartitionLabel)
+                return parts[0];
+        }
+        return null;
     }
 
     private static async Task<string> RunAsync(string command, string arguments, CancellationToken cancellationToken)

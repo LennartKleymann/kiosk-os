@@ -1,3 +1,4 @@
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using KioskOsWizard.Models;
 
@@ -23,6 +24,17 @@ public partial class ConfigStepViewModel : StepViewModel
     [ObservableProperty]
     private bool _browserModeKiosk = true;
 
+    [ObservableProperty]
+    private string _timezone;
+
+    /// <summary>
+    /// A stick that carries a config boots straight into the browser. Without
+    /// this the installer never appears, so there would be no way to put
+    /// kiosk-os on the internal disk from a wizard-made stick.
+    /// </summary>
+    [ObservableProperty]
+    private bool _installToDisk;
+
     public ConfigStepViewModel(KioskConfig config) : base(config)
     {
         Title = "Configure the kiosk";
@@ -32,29 +44,43 @@ public partial class ConfigStepViewModel : StepViewModel
         _wifiPassword = config.WifiPassword ?? "";
         _whitelist = string.Join("|", config.Whitelist);
         _browserModeKiosk = config.BrowserMode == BrowserMode.Kiosk;
+        _timezone = config.Timezone;
+        _installToDisk = config.AutoInstall;
     }
 
-    public override bool CanProceed =>
-        !string.IsNullOrWhiteSpace(Homepage) &&
-        (Homepage.StartsWith("http://") || Homepage.StartsWith("https://")) &&
-        (!UseWifi || !string.IsNullOrWhiteSpace(WifiSsid));
+    /// <summary>First problem with the current input, or null.</summary>
+    public string? ValidationMessage => BuildConfig(new KioskConfig()).Validate().FirstOrDefault();
 
-    public override void OnLeaving()
+    public override bool CanProceed => ValidationMessage is null;
+
+    public override void OnLeaving() => BuildConfig(Config);
+
+    private KioskConfig BuildConfig(KioskConfig target)
     {
-        Config.Homepage = Homepage.Trim();
-        Config.Connection = UseWifi ? ConnectionType.Wifi : ConnectionType.Wired;
-        Config.WifiSsid = UseWifi ? WifiSsid.Trim() : null;
-        Config.WifiPassword = UseWifi ? WifiPassword : null;
-        Config.BrowserMode = BrowserModeKiosk ? BrowserMode.Kiosk : BrowserMode.Fullscreen;
-        Config.Whitelist.Clear();
+        target.Homepage = (Homepage ?? "").Trim();
+        target.Connection = UseWifi ? ConnectionType.Wifi : ConnectionType.Wired;
+        target.WifiSsid = UseWifi ? WifiSsid.Trim() : null;
+        target.WifiPassword = UseWifi ? WifiPassword : null;
+        target.BrowserMode = BrowserModeKiosk ? BrowserMode.Kiosk : BrowserMode.Fullscreen;
+        target.Timezone = string.IsNullOrWhiteSpace(Timezone) ? "Europe/Berlin" : Timezone.Trim();
+        target.AutoInstall = InstallToDisk;
+        target.Whitelist.Clear();
         if (!string.IsNullOrWhiteSpace(Whitelist))
         {
             foreach (var d in Whitelist.Split('|', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries))
-                Config.Whitelist.Add(d);
+                target.Whitelist.Add(d);
         }
+        return target;
     }
 
-    partial void OnHomepageChanged(string value) => OnPropertyChanged(nameof(CanProceed));
-    partial void OnUseWifiChanged(bool value) => OnPropertyChanged(nameof(CanProceed));
-    partial void OnWifiSsidChanged(string value) => OnPropertyChanged(nameof(CanProceed));
+    private void Revalidate()
+    {
+        OnPropertyChanged(nameof(ValidationMessage));
+        OnPropertyChanged(nameof(CanProceed));
+    }
+
+    partial void OnHomepageChanged(string value) => Revalidate();
+    partial void OnUseWifiChanged(bool value) => Revalidate();
+    partial void OnWifiSsidChanged(string value) => Revalidate();
+    partial void OnWifiPasswordChanged(string value) => Revalidate();
 }

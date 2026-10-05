@@ -30,10 +30,13 @@
         </Border>
 
         <!-- Content -->
-        <ScrollViewer Grid.Row="1" Padding="32,16,32,16"
+        <!-- Spacing lives on the content: padding on the ScrollViewer itself
+             is not part of the scroll extent, which cut off the end of
+             longer steps. -->
+        <ScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <ContentControl Content="{Binding CurrentStep}"/>
+            <ContentControl Content="{Binding CurrentStep}" Margin="32,16,32,16"/>
         </ScrollViewer>
 
         <!-- Footer Navigation -->

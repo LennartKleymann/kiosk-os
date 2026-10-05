@@ -49,10 +49,32 @@
                          Background="#1a1a2e" Foreground="White"
                          BorderBrush="#2a2a3e" Padding="10,8"/>
                 <TextBox Text="{Binding WifiPassword}" PasswordChar="•"
-                         Watermark="WiFi password"
+                         Watermark="WiFi password (empty for an open network)"
                          Background="#1a1a2e" Foreground="White"
                          BorderBrush="#2a2a3e" Padding="10,8"/>
             </StackPanel>
         </StackPanel>
+
+        <!-- Timezone -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Timezone" Foreground="White" FontWeight="SemiBold"/>
+            <TextBox Text="{Binding Timezone}"
+                     Watermark="Europe/Berlin"
+                     Background="#1a1a2e" Foreground="White"
+                     BorderBrush="#2a2a3e" Padding="10,8"/>
+        </StackPanel>
+
+        <!-- Installation -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Installation" Foreground="White" FontWeight="SemiBold"/>
+            <CheckBox Content="Install kiosk-os on the internal disk of the kiosk PC"
+                      IsChecked="{Binding InstallToDisk}" Foreground="#ddd"/>
+            <TextBlock Text="On first boot the stick shows an installer that copies kiosk-os, including this configuration, onto the internal disk. Without this option the kiosk runs from the stick."
+                       Foreground="#888" FontSize="12" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <TextBlock Text="{Binding ValidationMessage}"
+                   IsVisible="{Binding ValidationMessage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                   Foreground="#f59e0b" TextWrapping="Wrap"/>
     </StackPanel>
 </UserControl>

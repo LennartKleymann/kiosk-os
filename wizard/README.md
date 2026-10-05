@@ -15,11 +15,15 @@ macOS device enumeration exists but the write path is not finished.
 ## What it does
 
 1. **Configure** — homepage, browser mode, network (wired or WiFi), timezone,
-   domain whitelist, idle timeouts
+   domain whitelist, and whether the kiosk PC should get kiosk-os installed on
+   its internal disk (`auto_install=yes`). Input the kiosk could not use — a
+   WPA password outside 8–63 characters, line breaks in values — is rejected
+   here rather than failing silently on the kiosk
 2. **Select a stick** — removable devices only, with size and model
 3. **Write** — downloads the ISO from the latest GitHub release (or uses a
    local file), writes it, verifies it, then drops the generated `kiosk.conf`
-   onto the `KIOSK_CFG` partition
+   onto the `KIOSK_CFG` partition of the stick that was just written. The file
+   is always written with LF line endings, on every platform
 
 The kiosk reads that partition on every boot
 (see `modules/config-fetcher.nix`), so the same stick can be reconfigured
