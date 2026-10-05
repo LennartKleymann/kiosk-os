@@ -9,6 +9,7 @@ let
 
     CONFIG_FILE="/etc/kiosk/config"
     IS_LIVE="no"
+    rm -f /run/kiosk/homepage-override
 
     if findmnt -n / | grep -qE 'tmpfs|overlay|squashfs|nix-store' 2>/dev/null; then
       IS_LIVE="yes"
@@ -59,12 +60,13 @@ let
       sleep 0.2
     done
 
-    echo "http://127.0.0.1:8484/" > /tmp/kiosk-homepage-override
+    echo "http://127.0.0.1:8484/" > /run/kiosk/homepage-override
   '';
 in
 {
   systemd.services.kiosk-installer-api = {
     description = "kiosk-os disk installer API";
+    path = [ "/run/current-system/sw" ];
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.python3}/bin/python3 ${installerApi}";
@@ -97,5 +99,6 @@ in
     util-linux
     python3
     nixos-install-tools
+    efibootmgr
   ];
 }

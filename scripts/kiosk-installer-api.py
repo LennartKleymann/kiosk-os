@@ -14,7 +14,8 @@ CONFIG_FILE = "/etc/kiosk/config"
 DISK_SYSTEM_FILE = "/etc/kiosk/disk-system"
 INSTALLER_HTML = "/etc/kiosk/installer.html"
 TOKEN_FILE = "/run/kiosk/installer-token"
-STATE_FILE = "/tmp/kiosk-install-state.json"
+OVERRIDE_FILE = "/run/kiosk/homepage-override"
+STATE_FILE = "/run/kiosk/install-state.json"
 TARGET = "/mnt"
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = 8484
@@ -144,30 +145,90 @@ def partition_suffix(disk):
     return "p" if "nvme" in disk or "mmcblk" in disk else ""
 
 
+STEPS = ["partition", "format", "copy", "bootloader", "config", "finalize"]
+LOCAL_CONFIG = "/run/kiosk/local.conf"
+INSTALL_LOG = "/run/kiosk/nixos-install.log"
+EFI_MIB = 512
+CFG_MIB = 256
+
+install_lock = threading.Lock()
+install_running = False
+
+
+def progress(percent, message, current):
+    write_state("running", percent, message, current, STEPS[:STEPS.index(current)])
+
+
+def human_size(n):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1000 or unit == "TB":
+            return f"{n:.1f} {unit}"
+        n /= 1000
+
+
+def watch_copy(stop, closure_bytes):
+    """Report copy progress as used space on the target vs. the system size."""
+    while not stop.is_set():
+        try:
+            st = os.statvfs(TARGET)
+            used = (st.f_blocks - st.f_bfree) * st.f_frsize
+            frac = min(used / closure_bytes, 1.0) if closure_bytes else 0
+            # Used space includes file system overhead and can exceed the
+            # system size near the end
+            shown = min(used, closure_bytes) if closure_bytes else used
+            progress(25 + int(frac * 50),
+                     f"Copying system files... {human_size(shown)} of {human_size(closure_bytes)}", "copy")
+        except OSError:
+            pass
+        stop.wait(2)
+
+
+def add_efi_boot_entry(disk):
+    """Put the installed disk first in the firmware boot order.
+
+    Without this, a machine that still has the stick plugged in boots the
+    installer again. Failure is not fatal: GRUB is installed to the removable
+    fallback path, which firmware finds on its own once the stick is gone.
+    """
+    if not os.path.isdir("/sys/firmware/efi"):
+        return
+    result = subprocess.run(
+        ["efibootmgr", "--create", "--disk", disk, "--part", "1",
+         "--label", "kiosk-os", "--loader", "\\EFI\\BOOT\\BOOTX64.EFI"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"[kiosk-installer] efibootmgr failed: {result.stderr.strip()}", flush=True)
+
+
 def install(disk):
     """Install kiosk-os to the target disk."""
+    boot_devices = boot_disks()
     p = partition_suffix(disk)
     part_efi = f"{disk}{p}1"
     part_root = f"{disk}{p}2"
     part_cfg = f"{disk}{p}3"
 
-    # --- Step 1: Partition ---
-    write_state("running", 5, f"Partitioning {disk}...", "partition", [])
+    # --- Step 1: Partition: 512 MiB EFI | root | 256 MiB config ---
+    progress(5, f"Partitioning {disk}...", "partition")
 
-    # Unmount anything on the target disk
-    for i in range(1, 10):
-        try_run(f"umount {disk}{p}{i}")
-        try_run(f"umount {disk}{i}")
     for mp in [f"{TARGET}/boot", TARGET, "/mnt/kiosk-cfg-target"]:
-        try_run(f"umount {mp}")
+        try_run(f"umount -R {mp}")
+    for part in run(f"lsblk -lnpo NAME {disk}").splitlines()[1:]:
+        try_run(f"umount {part.strip()}")
+        try_run(f"wipefs -a {part.strip()}")
+
+    size_mib = int(run(f"blockdev --getsize64 {disk}")) // (1024 * 1024)
+    cfg_start = size_mib - CFG_MIB - 1
 
     run(f"wipefs -a {disk}")
     run(f"parted -s {disk} mklabel gpt")
-    run(f"parted -s {disk} mkpart ESP fat32 1MiB 513MiB")
+    run(f"parted -s {disk} mkpart KIOSK_EFI fat32 1MiB {EFI_MIB + 1}MiB")
     run(f"parted -s {disk} set 1 esp on")
-    run(f"parted -s {disk} mkpart primary ext4 513MiB 95%")
-    run(f"parted -s {disk} mkpart primary fat32 95% 100%")
+    run(f"parted -s {disk} mkpart KIOSK_ROOT ext4 {EFI_MIB + 1}MiB {cfg_start}MiB")
+    run(f"parted -s {disk} mkpart KIOSK_CFG fat32 {cfg_start}MiB {size_mib - 1}MiB")
     try_run(f"partprobe {disk}")
+    try_run("udevadm settle")
 
     # Wait for partition device nodes to appear
     for part in (part_efi, part_root, part_cfg):
@@ -175,68 +236,151 @@ def install(disk):
             raise RuntimeError(f"partition {part} did not appear after partitioning")
 
     # --- Step 2: Format ---
-    write_state("running", 15, "Formatting partitions...", "format", ["partition"])
+    progress(15, "Formatting partitions...", "format")
 
     run(f"mkfs.fat -F32 -n KIOSK_EFI {part_efi}")
-    run(f"mkfs.ext4 -L KIOSK_ROOT -F {part_root}")
+    run(f"mkfs.ext4 -q -L KIOSK_ROOT -F {part_root}")
     run(f"mkfs.fat -F32 -n KIOSK_CFG {part_cfg}")
+    try_run("udevadm settle")
 
-    # --- Step 3: Mount ---
-    write_state("running", 20, "Mounting target...", "copy", ["partition", "format"])
+    # --- Step 3: Copy system; nixos-install also installs the bootloader ---
+    progress(20, "Mounting target...", "copy")
 
     run(f"mkdir -p {TARGET}")
     run(f"mount {part_root} {TARGET}")
     run(f"mkdir -p {TARGET}/boot")
     run(f"mount {part_efi} {TARGET}/boot")
 
-    # --- Step 4: Copy system ---
-    write_state("running", 25, "Copying system (this may take a few minutes)...", "copy", ["partition", "format"])
-
     with open(DISK_SYSTEM_FILE) as f:
         disk_system = f.read().strip()
-    run(f"nixos-install --root {TARGET} --no-root-passwd --system {disk_system}")
+    try:
+        closure = int(run(
+            f"nix --extra-experimental-features nix-command path-info -S {disk_system}").split()[-1])
+    except (RuntimeError, ValueError, IndexError):
+        closure = 0
 
-    # --- Step 5: Activate bootloader ---
-    write_state("running", 80, "Installing bootloader...", "bootloader", ["partition", "format", "copy"])
+    stop = threading.Event()
+    threading.Thread(target=watch_copy, args=(stop, closure), daemon=True).start()
+    proc = subprocess.Popen(
+        ["nixos-install", "--root", TARGET, "--system", disk_system,
+         "--no-root-passwd", "--no-channel-copy"],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    log = []
+    for line in proc.stdout:
+        log.append(line.rstrip())
+        if "installing the boot loader" in line:
+            stop.set()
+            progress(80, "Installing bootloader...", "bootloader")
+    proc.wait()
+    stop.set()
+    with open(INSTALL_LOG, "w") as f:
+        f.write("\n".join(log))
+    if proc.returncode != 0:
+        raise RuntimeError("nixos-install failed: " + " | ".join(log[-3:]))
+    if not os.path.exists(f"{TARGET}/boot/EFI/BOOT/BOOTX64.EFI"):
+        raise RuntimeError("bootloader missing on the EFI partition after nixos-install")
 
-    for d in ("dev", "proc", "sys"):
-        run(f"mount --bind /{d} {TARGET}/{d}")
-
-    # Ensure boot partition is mounted inside chroot
-    try_run(f"umount {TARGET}/boot")
-    run(f"mount {part_efi} {TARGET}/boot")
-
-    run(f"NIXOS_INSTALL_BOOTLOADER=1 chroot {TARGET} /nix/var/nix/profiles/system/bin/switch-to-configuration boot")
-
-    # --- Step 6: Copy kiosk config to config partition ---
-    write_state("running", 90, "Writing configuration...", "config", ["partition", "format", "copy", "bootloader"])
+    # --- Step 4: Copy the kiosk config to the config partition ---
+    progress(90, "Writing configuration...", "config")
 
     run("mkdir -p /mnt/kiosk-cfg-target")
     run(f"mount {part_cfg} /mnt/kiosk-cfg-target")
-    if os.path.exists(CONFIG_FILE):
-        run(f"cp {CONFIG_FILE} /mnt/kiosk-cfg-target/kiosk.conf")
-    elif os.path.exists("/etc/kiosk/default.conf"):
-        run("cp /etc/kiosk/default.conf /mnt/kiosk-cfg-target/kiosk.conf")
+    source = next((c for c in (LOCAL_CONFIG, CONFIG_FILE, "/etc/kiosk/default.conf")
+                   if os.path.exists(c)), None)
+    if source:
+        with open(source) as f:
+            # auto_install only means something on the stick
+            lines = [l for l in f.read().splitlines()
+                     if not re.match(r"^\s*auto_install\s*=", l)]
+        with open("/mnt/kiosk-cfg-target/kiosk.conf", "w") as f:
+            f.write("\n".join(lines) + "\n")
     try_run("umount /mnt/kiosk-cfg-target")
 
-    # --- Step 7: Cleanup ---
-    write_state("running", 95, "Finalizing...", "finalize", ["partition", "format", "copy", "bootloader", "config"])
+    # --- Step 5: Cleanup ---
+    progress(95, "Finalizing...", "finalize")
 
-    for d in ("sys", "proc", "dev"):
-        try_run(f"umount {TARGET}/{d}")
-    try_run(f"umount {TARGET}/boot")
-    try_run(f"umount {TARGET}")
+    try_run(f"umount -R {TARGET}")
+    add_efi_boot_entry(disk)
     run("sync")
 
-    write_state("done", 100, "Installation complete", "", ["partition", "format", "copy", "bootloader", "config", "finalize"])
+    write_state("done", 100, "Installation complete", "", list(STEPS))
+    reboot_when_stick_is_pulled(boot_devices)
 
 
 def run_install_thread(disk):
     """Wrapper that catches errors and writes them to state."""
+    global install_running
     try:
         install(disk)
     except Exception as e:
+        try_run(f"umount -R {TARGET}")
+        try_run("umount /mnt/kiosk-cfg-target")
         write_state("error", 0, f"Installation failed: {e}", "", [])
+    finally:
+        with install_lock:
+            install_running = False
+
+
+def hard_reboot():
+    """Reboot without touching the boot medium.
+
+    The live system runs from the stick. Once it is pulled, every binary on it
+    is gone — systemctl and reboot included — so the reboot goes straight
+    through the kernel. Nothing on a live system needs to be saved.
+    """
+    os.sync()
+    try:
+        with open("/proc/sysrq-trigger", "w") as f:
+            f.write("b")
+    except OSError:
+        subprocess.run(["reboot", "-f"], check=False)
+
+
+def reboot_when_stick_is_pulled(boot_devices):
+    """After a successful install, restart as soon as the stick is removed.
+
+    Pulling the stick takes the browser down with it (it runs from the stick),
+    so a click on "Reboot now" afterwards would never arrive. This process is
+    locked in RAM and only watches sysfs, so it keeps working.
+    """
+    # The squashfs loop device never goes away; only physical media count
+    names = [os.path.basename(d) for d in boot_devices
+             if not os.path.basename(d).startswith(("loop", "zram", "ram"))]
+    if not names:
+        return
+
+    def watch():
+        while all(os.path.exists(f"/sys/block/{n}") for n in names):
+            time.sleep(0.5)
+        print("[kiosk-installer] Boot medium removed, rebooting", flush=True)
+        hard_reboot()
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
+def leave_installer():
+    """Start the regular kiosk session and stop this API.
+
+    Restarting the session (rather than letting the page navigate away) runs
+    the normal start-up path: reachability check, offline error page with
+    auto-retry, wallpaper.
+    """
+    try:
+        subprocess.run(["systemctl", "restart", "--no-block", "cage-tty1.service"],
+                       capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    os._exit(0)
+
+
+def lock_in_memory():
+    """Keep this process in RAM so it still works after the stick is pulled."""
+    try:
+        import ctypes
+        ctypes.CDLL(None, use_errno=True).mlockall(1 | 2)  # MCL_CURRENT | MCL_FUTURE
+    except Exception:
+        pass
 
 
 # --- HTTP API ---
@@ -317,11 +461,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Invalid JSON"}, 400)
                 return
 
-            # Strict validation: only allow /dev/<alphanumeric>
+            # Strict validation: only allow /dev/<alphanumeric>, and only a
+            # disk the UI offered — never the boot medium
             if not VALID_DISK_PATH.match(disk) or not os.path.exists(disk):
                 self.send_json({"error": "Invalid disk path"}, 400)
                 return
+            if disk not in [d.get("path") for d in get_disks()]:
+                self.send_json({"error": "Disk is not an install target"}, 400)
+                return
 
+            global install_running
+            with install_lock:
+                if install_running:
+                    self.send_json({"error": "Installation already running"}, 409)
+                    return
+                install_running = True
+            progress(1, "Starting installation...", "partition")
             threading.Thread(target=run_install_thread, args=(disk,), daemon=True).start()
             self.send_json({"status": "started"})
 
@@ -330,21 +485,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"status": "skipped", "homepage": homepage})
             # Shut down once the user opts out: the kiosk is about to load a
             # real website and this API must not outlive the installer UI.
-            try:
-                os.unlink(TOKEN_FILE)
-            except OSError:
-                pass
-            threading.Timer(1.0, lambda: os._exit(0)).start()
+            for path in (TOKEN_FILE, OVERRIDE_FILE):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+            threading.Timer(1.0, leave_installer).start()
 
         elif self.path == "/reboot":
             self.send_json({"status": "rebooting"})
-            threading.Timer(2.0, lambda: subprocess.run(["reboot"], check=False)).start()
+            threading.Timer(1.0, hard_reboot).start()
 
         else:
             self.send_json({"error": "not found"}, 404)
 
 
 if __name__ == "__main__":
+    lock_in_memory()
     write_state("idle", 0, "", "", [])
     server = HTTPServer((LISTEN_HOST, LISTEN_PORT), Handler)
     print(f"[kiosk-installer] API listening on http://{LISTEN_HOST}:{LISTEN_PORT}")
