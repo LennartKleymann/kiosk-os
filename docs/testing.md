@@ -3,6 +3,12 @@
 Manual test plan for a release candidate. Written for Hyper-V, but the
 scenarios apply to any hypervisor.
 
+Most of it is also scripted: [tests/vm](../tests/vm/README.md) runs the
+scenarios in QEMU/KVM, writes the stick with the setup wizard's own code,
+clicks through the installer and checks the installed system — including a
+real WPA2 connection for the WiFi preset. Run it before tagging a release;
+the manual plan below is for real hardware and Hyper-V.
+
 ## VM setup (Hyper-V)
 
 | Setting | Value | Why |
