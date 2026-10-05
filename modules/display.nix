@@ -11,6 +11,7 @@
     packages = with pkgs; [
       noto-fonts
       noto-fonts-emoji
+      noto-fonts-cjk-sans  # Chinese, Japanese, Korean — otherwise shown as boxes
     ];
     fontconfig.defaultFonts = {
       sansSerif = [ "Noto Sans" ];
