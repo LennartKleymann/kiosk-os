@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Text.Json;
+using System.Xml.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,84 +14,96 @@ public record KioskOsRelease(
     string TagName, string Name, string DownloadUrl, long Size, string? ChecksumUrl = null);
 
 /// <summary>
-/// Fetches kiosk-os releases from the GitHub Releases API and downloads
-/// ISO assets with progress reporting.
+/// Finds kiosk-os releases and downloads ISO assets with progress reporting.
+///
+/// Releases are read from the repository's Atom feed rather than the GitHub
+/// REST API: the API allows only 60 anonymous requests per hour and IP, which
+/// a school or office behind one shared address exhausts quickly — the wizard
+/// then fails with "403 rate limit exceeded". The feed is an ordinary web page
+/// without that limit. It does not list assets, so the ISO is located by the
+/// file name the release workflow always uses and checked with a HEAD request.
 /// </summary>
 public class GithubReleaseService
 {
-    private const string ApiUrl = "https://api.github.com/repos/LennartKleymann/kiosk-os/releases";
-    private static readonly HttpClient Http = CreateClient();
+    private const string Repository = "https://github.com/LennartKleymann/kiosk-os";
+    public const string FeedUrl = Repository + "/releases.atom";
+    private const string IsoName = "kiosk-os.iso";
+
+    private static readonly HttpClient DefaultClient = CreateClient();
+    private readonly HttpClient Http;
+
+    public GithubReleaseService(HttpClient? http = null) => Http = http ?? DefaultClient;
 
     private static HttpClient CreateClient()
     {
         var h = new HttpClient();
         h.DefaultRequestHeaders.Add("User-Agent", "KioskOsWizard");
-        h.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
         return h;
     }
 
     /// <summary>
-    /// Newest stable release with an ISO, or the newest pre-release when there
-    /// is no stable one yet. GitHub's /releases/latest skips pre-releases and
-    /// answers 404 while a project only has release candidates.
+    /// Newest stable release that has an ISO, or the newest pre-release when
+    /// there is no stable one yet. A release whose ISO is not uploaded (yet) —
+    /// e.g. while its build is still running — is skipped.
     /// </summary>
     public async Task<KioskOsRelease?> GetLatestReleaseAsync(CancellationToken ct = default)
     {
-        var json = await Http.GetStringAsync(ApiUrl, ct);
-        using var doc = JsonDocument.Parse(json);
+        var feed = await Http.GetStringAsync(FeedUrl, ct);
 
         KioskOsRelease? newestPrerelease = null;
-        foreach (var e in doc.RootElement.EnumerateArray())   // newest first
+        foreach (var (tag, title) in ParseFeed(feed))   // newest first
         {
-            if (e.TryGetProperty("draft", out var d) && d.ValueKind == JsonValueKind.True) continue;
-            var release = ParseRelease(e);
-            if (release is null) continue;
+            var prerelease = IsPrerelease(tag);
+            if (prerelease && newestPrerelease is not null) continue;
 
-            var pre = e.TryGetProperty("prerelease", out var p) && p.ValueKind == JsonValueKind.True;
-            if (!pre) return release;
-            newestPrerelease ??= release;
+            var release = await ProbeAsync(tag, title, ct);
+            if (release is null) continue;
+            if (!prerelease) return release;
+            newestPrerelease = release;
         }
         return newestPrerelease;
     }
 
-    public async Task<IReadOnlyList<KioskOsRelease>> GetAllReleasesAsync(CancellationToken ct = default)
+    /// <summary>Tag and title of each release in the feed, in feed order (newest first).</summary>
+    public static IReadOnlyList<(string Tag, string Title)> ParseFeed(string atom)
     {
-        var json = await Http.GetStringAsync(ApiUrl, ct);
-        var releases = new List<KioskOsRelease>();
-        using var doc = JsonDocument.Parse(json);
-        foreach (var e in doc.RootElement.EnumerateArray())
+        XNamespace ns = "http://www.w3.org/2005/Atom";
+        var result = new List<(string, string)>();
+        foreach (var entry in XDocument.Parse(atom).Root?.Elements(ns + "entry") ?? [])
         {
-            var r = ParseRelease(e);
-            if (r != null) releases.Add(r);
+            // <link rel="alternate" href="https://github.com/<owner>/<repo>/releases/tag/<tag>"/>
+            var href = entry.Elements(ns + "link").Select(l => (string?)l.Attribute("href")).FirstOrDefault(h => h is not null);
+            const string marker = "/releases/tag/";
+            var i = href?.IndexOf(marker, StringComparison.Ordinal) ?? -1;
+            if (href is null || i < 0) continue;
+            var tag = Uri.UnescapeDataString(href[(i + marker.Length)..]);
+            var title = (string?)entry.Element(ns + "title") ?? tag;
+            result.Add((tag, title.Trim()));
         }
-        return releases;
+        return result;
     }
 
-    private static KioskOsRelease? ParseRelease(JsonElement e)
+    /// <summary>Same rule as the release workflow: a tag with a suffix (v1.0.0-rc1) is a pre-release.</summary>
+    public static bool IsPrerelease(string tag) => tag.Contains('-');
+
+    public static string AssetUrl(string tag, string file) =>
+        $"{Repository}/releases/download/{Uri.EscapeDataString(tag)}/{file}";
+
+    /// <summary>The release if its ISO exists, with the size from the download's headers.</summary>
+    private async Task<KioskOsRelease?> ProbeAsync(string tag, string title, CancellationToken ct)
     {
-        var tag = e.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
-        var name = e.TryGetProperty("name", out var n) ? n.GetString() ?? tag : tag;
-
-        if (!e.TryGetProperty("assets", out var assets)) return null;
-
-        string? isoUrl = null, checksumUrl = null;
-        long isoSize = 0;
-
-        foreach (var asset in assets.EnumerateArray())
+        var isoUrl = AssetUrl(tag, IsoName);
+        try
         {
-            var assetName = asset.TryGetProperty("name", out var an) ? an.GetString() ?? "" : "";
-            var url = asset.TryGetProperty("browser_download_url", out var u) ? u.GetString() ?? "" : "";
-
-            if (assetName.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase))
-                checksumUrl = url;
-            else if (assetName.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) && isoUrl is null)
-            {
-                isoUrl = url;
-                isoSize = asset.TryGetProperty("size", out var s) ? s.GetInt64() : 0;
-            }
+            using var head = await Http.SendAsync(new HttpRequestMessage(HttpMethod.Head, isoUrl), ct);
+            if (!head.IsSuccessStatusCode) return null;
+            var size = head.Content.Headers.ContentLength ?? 0;
+            return new KioskOsRelease(tag, title, isoUrl, size, AssetUrl(tag, IsoName + ".sha256"));
         }
-
-        return isoUrl is null ? null : new KioskOsRelease(tag, name, isoUrl, isoSize, checksumUrl);
+        catch (HttpRequestException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
