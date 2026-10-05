@@ -43,8 +43,19 @@
         }
     </style>
     <script>
-        // Auto-retry every 30 seconds
-        setTimeout(() => location.reload(), 30000);
+        // The kiosk passes the homepage as ?url=... — probe it every 10 seconds
+        // and navigate there as soon as it answers.
+        const target = new URLSearchParams(location.search).get('url');
+        async function probe() {
+            if (!target) return;
+            try {
+                await fetch(target, { mode: 'no-cors', cache: 'no-store' });
+                location.replace(target);
+            } catch (e) {
+                setTimeout(probe, 10000);
+            }
+        }
+        setTimeout(probe, 10000);
     </script>
 </head>
 <body>
@@ -52,7 +63,7 @@
         <div class="icon">&#9888;</div>
         <h1>Service Unavailable</h1>
         <p>The configured homepage could not be reached. Please check the network connection or contact your administrator.</p>
-        <p class="retry">Retrying automatically every 30 seconds...</p>
+        <p class="retry">Retrying automatically every 10 seconds...</p>
     </div>
 </body>
 </html>
