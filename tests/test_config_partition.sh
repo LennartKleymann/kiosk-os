@@ -10,10 +10,17 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 image="$work/test.iso"
 
-# Stand-in for the isohybrid layout: an MBR with one occupied slot and no GPT.
+# Stand-in for the isohybrid layout xorriso produces: a GPT (primary at LBA 1,
+# backup at the end) plus a non-protective MBR with one occupied slot. An
+# earlier version of this test had no GPT — which is exactly why it missed
+# that Windows refuses to mount anything on such a stick.
 truncate -s 64M "$image"
-echo 'label: dos' | sfdisk "$image" >/dev/null 2>&1
-echo '2048,32768,0x17' | sfdisk --append --no-reread --no-tell-kernel "$image" >/dev/null 2>&1
+echo 'label: gpt' | sfdisk "$image" >/dev/null 2>&1
+echo '2048,32768' | sfdisk --append --no-reread --no-tell-kernel "$image" >/dev/null 2>&1
+# overwrite the protective MBR entry with an isohybrid-style entry
+printf '\x80\x00\x00\x00\x17\x00\x00\x00\x00\x08\x00\x00\x00\x80\x00\x00' |
+  dd of="$image" bs=1 seek=446 conv=notrunc status=none
+[ "$(dd if="$image" bs=1 skip=512 count=8 status=none)" = "EFI PART" ] || { echo "test setup: no GPT"; exit 1; }
 
 before=$(dd if="$image" bs=446 count=1 status=none | sha256sum)
 
@@ -46,6 +53,15 @@ fstype=$(blkid -p -o value -s TYPE -O $(( start * 512 )) "$image")
 check "config partition is FAT" "$fstype" "vfat"
 
 check "start is 1 MiB aligned" "$(( start % 2048 ))" "0"
+
+# Windows creates no volumes on a disk that still carries GPT structures
+check "primary GPT header removed" "$(dd if="$image" bs=1 skip=512 count=8 status=none | tr -d '\0')" ""
+check "GPT entry array removed" "$(dd if="$image" bs=512 skip=2 count=32 status=none | tr -d '\0' | wc -c)" "0"
+backup_hits=$(python3 -c "
+import sys; d = open(sys.argv[1], 'rb').read()
+print(sum(1 for i in range(0, len(d), 512) if d[i:i + 8] == b'EFI PART'))" "$image")
+check "no GPT header anywhere (incl. backup)" "$backup_hits" "0"
+check "partition table is read as MBR" "$(blkid -p -o value -s PTTYPE "$image")" "dos"
 
 # The kiosk mounts this partition and reads kiosk.conf off it; if it cannot be
 # mounted as a plain FAT filesystem, none of the configuration ever arrives.
