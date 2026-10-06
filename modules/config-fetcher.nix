@@ -45,6 +45,9 @@ let
         CFG_DEV="$dev"; break
       fi
     done
+    # for the diagnostics report (modules/diagnostics.nix)
+    printf '%s' "$CFG_DEV" > "$RUN_DIR/cfg-device"
+    printf '%s' "$BOOT_SRC" > "$RUN_DIR/boot-device"
 
     USB_CONFIG_FILE=""
     if [ -n "$CFG_DEV" ]; then

@@ -11,5 +11,6 @@
     ./config-fetcher.nix  # Load config from USB partition or remote URL
     ./admin.nix           # Optional SSH (disabled by default)
     ./installer.nix       # Browser-based disk installer
+    ./diagnostics.nix     # Boot report on the KIOSK_CFG partition
   ];
 }
