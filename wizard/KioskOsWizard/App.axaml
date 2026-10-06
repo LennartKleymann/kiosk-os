@@ -2,8 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="KioskOsWizard.App"
              xmlns:local="using:KioskOsWizard"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
+             <!-- Always dark: the views are designed for a dark background with white
+                  text. Following a light Windows theme made focused text boxes white
+                  on white. -->
 
     <Application.DataTemplates>
         <local:ViewLocator/>

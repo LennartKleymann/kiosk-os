@@ -51,7 +51,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (_currentIndex == _steps.Count - 1)
         {
-            // Finish — close the app or show final screen
+            // Finish: the stick is written, nothing left to do
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown();
             return;
         }
 
