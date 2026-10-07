@@ -27,6 +27,11 @@ public partial class ConfigStepViewModel : StepViewModel
     [ObservableProperty]
     private string _timezone;
 
+    public System.Collections.Generic.IReadOnlyList<KeyboardLayout> KeyboardLayoutOptions => KeyboardLayouts.All;
+
+    [ObservableProperty]
+    private KeyboardLayout _keyboardLayout;
+
     /// <summary>
     /// A stick that carries a config boots straight into the browser. Without
     /// this the installer never appears, so there would be no way to put
@@ -45,6 +50,7 @@ public partial class ConfigStepViewModel : StepViewModel
         _whitelist = string.Join("|", config.Whitelist);
         _browserModeKiosk = config.BrowserMode == BrowserMode.Kiosk;
         _timezone = config.Timezone;
+        _keyboardLayout = KeyboardLayouts.Find(config.KeyboardLayout);
         _installToDisk = config.AutoInstall;
     }
 
@@ -63,6 +69,7 @@ public partial class ConfigStepViewModel : StepViewModel
         target.WifiPassword = UseWifi ? WifiPassword : null;
         target.BrowserMode = BrowserModeKiosk ? BrowserMode.Kiosk : BrowserMode.Fullscreen;
         target.Timezone = string.IsNullOrWhiteSpace(Timezone) ? "Europe/Berlin" : Timezone.Trim();
+        target.KeyboardLayout = (KeyboardLayout ?? KeyboardLayouts.All[0]).Code;
         target.AutoInstall = InstallToDisk;
         target.Whitelist.Clear();
         if (!string.IsNullOrWhiteSpace(Whitelist))

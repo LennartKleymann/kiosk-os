@@ -64,6 +64,18 @@
                      BorderBrush="#2a2a3e" Padding="10,8"/>
         </StackPanel>
 
+        <!-- Keyboard layout -->
+        <StackPanel Spacing="6">
+            <TextBlock Text="Keyboard layout" Foreground="White" FontWeight="SemiBold"/>
+            <TextBlock Text="The layout of the keyboard attached to the kiosk"
+                       Foreground="#888" FontSize="12"/>
+            <ComboBox ItemsSource="{Binding KeyboardLayoutOptions}"
+                      SelectedItem="{Binding KeyboardLayout}"
+                      HorizontalAlignment="Stretch"
+                      Background="#1a1a2e" Foreground="White"
+                      BorderBrush="#2a2a3e" Padding="10,8"/>
+        </StackPanel>
+
         <!-- Installation -->
         <StackPanel Spacing="6">
             <TextBlock Text="Installation" Foreground="White" FontWeight="SemiBold"/>

@@ -21,6 +21,9 @@ public class KioskConfig
     public string? Wallpaper { get; set; }
     public string Timezone { get; set; } = "Europe/Berlin";
 
+    /// <summary>XKB layout code, one of <see cref="KeyboardLayouts.All"/>.</summary>
+    public string KeyboardLayout { get; set; } = "us";
+
     public int SessionIdleMinutes { get; set; }
     public int DpmsIdleMinutes { get; set; }
 
@@ -84,6 +87,7 @@ public class KioskConfig
         lines.Add("# === Display ===");
         if (!string.IsNullOrEmpty(Wallpaper)) lines.Add($"wallpaper={Clean(Wallpaper)}");
         lines.Add($"timezone={Clean(Timezone)}");
+        lines.Add($"primary_keyboard_layout={Clean(KeyboardLayout)}");
         lines.Add("");
 
         if (SessionIdleMinutes > 0 || DpmsIdleMinutes > 0)

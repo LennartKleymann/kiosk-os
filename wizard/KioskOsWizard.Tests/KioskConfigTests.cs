@@ -204,4 +204,33 @@ public class KioskConfigTests
         Assert.False(step.CanProceed);
         Assert.NotNull(step.ValidationMessage);
     }
+
+    [Fact]
+    public void Keyboard_layout_defaults_to_us()
+    {
+        Assert.Equal("us", ReadValue(new KioskConfig().ToConfigFileContent(), "primary_keyboard_layout"));
+    }
+
+    [Fact]
+    public void Keyboard_layout_chosen_in_the_wizard_reaches_the_config_file()
+    {
+        var config = new KioskConfig();
+        var step = new KioskOsWizard.ViewModels.ConfigStepViewModel(config)
+        {
+            KeyboardLayout = KeyboardLayouts.Find("de"),
+        };
+        step.OnLeaving();
+
+        Assert.Equal("de", ReadValue(config.ToConfigFileContent(), "primary_keyboard_layout"));
+    }
+
+    [Fact]
+    public void Offered_layouts_are_layout_codes_not_languages()
+    {
+        var codes = KeyboardLayouts.All.Select(l => l.Code).ToList();
+        Assert.Equal(codes.Count, codes.Distinct().Count());
+        Assert.DoesNotContain("en", codes);   // a language, not an XKB layout — it disabled kiosk keyboards
+        Assert.All(codes, c => Assert.Matches("^[a-z]{2,5}$", c));
+        Assert.Equal("us", KeyboardLayouts.All[0].Code);
+    }
 }
