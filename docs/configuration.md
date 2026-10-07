@@ -66,7 +66,7 @@ password manager are disabled via Chromium policies; browsing always runs in inc
 |---|---|---|---|
 | `wallpaper` | URL | — | Wallpaper image URL, downloaded at boot |
 | `timezone` | tz string | `Europe/Berlin` | System timezone, e.g. `America/Chicago` |
-| `primary_keyboard_layout` | XKB layout | `us` | Keyboard layout, e.g. `de`, `fr` |
+| `primary_keyboard_layout` | XKB layout code | `us` | Keyboard layout: `us`, `gb`, `de`, `fr`, `es`, … — a layout code, not a language (`en` is read as `us`). Unknown values fall back to `us`, so a typo never disables the keyboard |
 
 ## Power Management
 
