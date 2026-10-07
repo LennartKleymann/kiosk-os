@@ -34,7 +34,7 @@ public class FileDeviceAccess : IDeviceAccess
         => Task.CompletedTask;
 
     public virtual Stream OpenWrite(string devicePath) =>
-        new FileStream(devicePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+        new FileStream(devicePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);  // like a device: never truncated
 
     public virtual Stream OpenRead(string devicePath) =>
         new FileStream(devicePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);

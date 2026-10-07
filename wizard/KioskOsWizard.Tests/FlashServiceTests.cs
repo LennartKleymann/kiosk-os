@@ -20,8 +20,35 @@ public class FlashServiceTests : IDisposable
         var path = Path.Combine(_dir, $"image-{length}.iso");
         var data = new byte[length];
         Random.Shared.NextBytes(data);
+        if (length >= 512) data[510] = 0;   // never look like an MBR by accident
         File.WriteAllBytes(path, data);
         return path;
+    }
+
+    /// <summary>
+    /// Windows remembers drive letters per MBR disk signature. Identical
+    /// signatures on every stick made Windows treat each new stick as the old
+    /// one, often leaving the config partition without a letter.
+    /// </summary>
+    [Fact]
+    public async Task Each_written_stick_gets_its_own_disk_signature()
+    {
+        var iso = CreateImage(64 * 1024);
+        var image = File.ReadAllBytes(iso);
+        image[510] = 0x55; image[511] = 0xAA;
+        File.WriteAllBytes(iso, image);
+
+        var service = new FlashService(new FileDeviceAccess(sectorSize: 512));
+        await service.FlashAsync(iso, TargetPath, _ => { });
+        var first = File.ReadAllBytes(TargetPath);
+        await service.FlashAsync(iso, TargetPath, _ => { });
+        var second = File.ReadAllBytes(TargetPath);
+
+        Assert.NotEqual(image[440..444], first[440..444]);
+        Assert.NotEqual(first[440..444], second[440..444]);
+        // everything else is exactly the image
+        Assert.Equal(image[..440], first[..440]);
+        Assert.Equal(image[444..], first[444..image.Length]);
     }
 
     private string TargetPath => Path.Combine(_dir, "device.img");

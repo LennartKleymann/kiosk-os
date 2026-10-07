@@ -4,7 +4,7 @@ VM_DIR=${VM_DIR:-/root/kiosk-vm}
 # The stick is attached as USB mass storage (id usbstick, hot-removable via QMP).
 set -euo pipefail
 NAME=$1; shift
-STICK=""; DISK=""; NET="-nic user,model=virtio-net-pci,hostfwd=tcp::2222-${GUEST_IP:-}:22"
+STICK=""; DISK=""; NET="-nic user,model=virtio-net-pci,hostfwd=tcp::${SSH_PORT:-2222}-${GUEST_IP:-}:22"
 while [ $# -gt 0 ]; do case $1 in
   --stick) STICK=$2; shift 2;; --disk) DISK=$2; shift 2;; --nonet) NET="-nic none"; shift;; *) shift;; esac; done
 mkdir -p $VM_DIR; cd $VM_DIR

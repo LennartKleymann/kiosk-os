@@ -121,6 +121,8 @@ public class FlashService
             read => progress(new FlashProgress(FlashStage.Verifying, read, totalBytes)),
             cancellationToken);
 
+        await GiveUniqueDiskSignatureAsync(devicePath, sectorSize, cancellationToken);
+
         WizardLog.Info("Verified, releasing device");
         await _device.FinishWritingAsync(devicePath, cancellationToken);
     }
@@ -227,6 +229,32 @@ public class FlashService
             ArrayPool<byte>.Shared.Return(fromDevice);
             ArrayPool<byte>.Shared.Return(fromSource);
         }
+    }
+
+    /// <summary>
+    /// Every image carries the same MBR disk signature, and Windows remembers
+    /// drive letters per signature and partition offset. To Windows each newly
+    /// written stick therefore looked like the previous one and inherited
+    /// whatever letters (or none) it had — the config partition often ended up
+    /// without one. A random signature makes each stick a new disk. Nothing
+    /// boots by this value (Linux uses labels, the loader searches by file).
+    /// </summary>
+    private async Task GiveUniqueDiskSignatureAsync(string devicePath, int sectorSize, CancellationToken cancellationToken)
+    {
+        var sector = new byte[Math.Max(sectorSize, 512)];
+        await using (var read = _device.OpenRead(devicePath))
+        {
+            if (await ReadExactlyAsync(read, sector, sector.Length, cancellationToken) < 512) return;
+        }
+        if (sector[510] != 0x55 || sector[511] != 0xAA) return;   // not an MBR
+
+        RandomNumberGenerator.Fill(sector.AsSpan(440, 4));
+        if (sector.AsSpan(440, 4).IndexOfAnyExcept((byte)0) < 0) sector[440] = 1;   // 0 means "no signature"
+
+        await using var write = _device.OpenWrite(devicePath);
+        await write.WriteAsync(sector, cancellationToken);
+        await write.FlushAsync(cancellationToken);
+        WizardLog.Info($"Disk signature set to {Convert.ToHexString(sector, 440, 4)}");
     }
 
     private static async Task<int> ReadExactlyAsync(

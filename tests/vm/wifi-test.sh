@@ -11,7 +11,7 @@ H=$(nix build --no-link --print-out-paths .#nixosConfigurations.kiosk.pkgs.hosta
 I=$(nix build --no-link --print-out-paths .#nixosConfigurations.kiosk.pkgs.iw^out)
 nix-store --export $(nix-store -qR $H $I) > $VM_DIR/wifitools.closure
 HOST=$(ip -4 -o addr show scope global | awk '$2!="lo"{print $4}' | cut -d/ -f1 | head -1)
-scp -q -i $VM_DIR/id_test -P 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VM_DIR/wifitools.closure admin@$HOST:/tmp/
+scp -q -i $VM_DIR/id_test -P ${SSH_PORT:-2222} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $VM_DIR/wifitools.closure admin@$HOST:/tmp/
 "$HERE/ssh.sh" "set -e
 sudo nix-store --import < /tmp/wifitools.closure >/dev/null
 lsmod | grep -q mac80211_hwsim || sudo modprobe mac80211_hwsim radios=2

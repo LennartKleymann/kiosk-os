@@ -46,6 +46,37 @@ public class ConfigWriterService
         // Linux caches the write; the user pulls the stick right after "Done".
         if (OperatingSystem.IsLinux())
             await RunAsync("sync", string.Empty, cancellationToken);
+
+        // The write itself goes through the volume path, which needs no drive
+        // letter — but the user needs one to edit kiosk.conf in Explorer later.
+        if (OperatingSystem.IsWindows() && devicePath is not null)
+            ConfigDriveLetter = await EnsureDriveLetterAsync(devicePath, cancellationToken);
+    }
+
+    /// <summary>Drive letter of the config partition after <see cref="WriteAsync"/> (Windows), if any.</summary>
+    public string? ConfigDriveLetter { get; private set; }
+
+    private static async Task<string?> EnsureDriveLetterAsync(string devicePath, CancellationToken cancellationToken)
+    {
+        var diskNumber = DevicePaths.ExtractDiskNumber(devicePath);
+        if (diskNumber is null) return null;
+
+        var script =
+            $"$p = Get-Partition -DiskNumber {diskNumber} | " +
+            $"Where-Object {{ ($_ | Get-Volume -ErrorAction SilentlyContinue).FileSystemLabel -eq '{PartitionLabel}' }} | Select-Object -First 1; " +
+            "if ($p -and -not $p.DriveLetter) { " +
+            "$p | Add-PartitionAccessPath -AssignDriveLetter -ErrorAction SilentlyContinue; " +
+            $"$p = Get-Partition -DiskNumber {diskNumber} -PartitionNumber $p.PartitionNumber }}; " +
+            "if ($p.DriveLetter) { [string]$p.DriveLetter }";
+
+        var letter = (await RunAsync("powershell", $"-NoProfile -Command \"{script}\"", cancellationToken)).Trim();
+        if (letter.Length == 1 && char.IsLetter(letter[0]))
+        {
+            WizardLog.Info($"Config partition has drive letter {letter}:");
+            return letter;
+        }
+        WizardLog.Info("Config partition has no drive letter");
+        return null;
     }
 
     private async Task<string?> WaitForPartitionAsync(string? devicePath, CancellationToken cancellationToken)

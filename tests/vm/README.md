@@ -26,7 +26,7 @@ ssh-keygen -t ed25519 -N "" -f "$VM_DIR/id_test"
 | Script | Purpose |
 |---|---|
 | `wizard-stick.sh <img> [extra] -- <wizard args>` | Writes a stick image with the wizard code. `extra` lines are appended with CRLF, like Notepad would |
-| `run-vm.sh <name> [--stick img] [--disk qcow2]` | Boots the VM (UEFI, stick as USB device id `usbstick`, target disk as NVMe). `VGA="-vga std"` selects the plain VGA adapter, `GUEST_IP=` the forwarded address for static-IP tests |
+| `run-vm.sh <name> [--stick img] [--disk qcow2]` | Boots the VM (UEFI, stick as USB device id `usbstick`, target disk as NVMe). `VGA="-vga std"` selects the plain VGA adapter, `GUEST_IP=` the forwarded address for static-IP tests, `SSH_PORT=` the host port for SSH (default 2222) |
 | `qmp.py shot <png> \| click x y \| type text \| key combo \| raw cmd json` | Screenshot / mouse / keyboard / raw QMP. `raw device_del '{"id":"usbstick"}'` pulls the stick |
 | `ssh.sh <cmd>` | Runs a command on the kiosk (needs `admin_ssh=yes` with the test key in the config) |
 | `wifi-test.sh` | Real WPA2 association test: two `mac80211_hwsim` radios, a hostapd access point in its own network namespace, and the kiosk's own config fetcher connecting to it |

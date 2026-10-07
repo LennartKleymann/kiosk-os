@@ -88,7 +88,9 @@ public partial class FlashStepViewModel : StepViewModel
             try
             {
                 await _configWriter.WriteAsync(config, DevicePath, _cts.Token);
-                ProgressText = "Done — the stick is ready.";
+                ProgressText = _configWriter.ConfigDriveLetter is { } drive
+                    ? $"Done — the stick is ready. Its configuration is kiosk.conf on drive {drive}: (KIOSK_CFG)."
+                    : "Done — the stick is ready.";
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
