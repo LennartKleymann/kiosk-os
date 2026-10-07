@@ -1,0 +1,63 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:KioskOsWizard.ViewModels"
+             x:DataType="vm:FlashStepViewModel"
+             x:Class="KioskOsWizard.Views.FlashStepView">
+    <StackPanel Spacing="20" MaxWidth="560">
+
+        <Border Background="#2d1b1b" BorderBrush="#5c2626" BorderThickness="1"
+                CornerRadius="8" Padding="16"
+                IsVisible="{Binding !IsDone}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="All data will be permanently erased"
+                           FontWeight="SemiBold" Foreground="#ef4444"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#cca0a0" FontSize="13">
+                    <Run Text="The following USB device will be completely overwritten:"/>
+                </TextBlock>
+                <StackPanel Margin="0,8,0,0" Spacing="2">
+                    <TextBlock Text="{Binding DeviceModel}" Foreground="White" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding DevicePath}" Foreground="#888" FontSize="12"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Progress -->
+        <StackPanel Spacing="10" IsVisible="{Binding IsFlashing}">
+            <TextBlock Text="{Binding ProgressText}" Foreground="#ddd"/>
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}"
+                         Height="6" Foreground="#6366f1" Background="#1a1a2e"/>
+        </StackPanel>
+
+        <!-- Error -->
+        <Border Background="#2d1b1b" BorderBrush="#5c2626" BorderThickness="1"
+                CornerRadius="8" Padding="16"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Error" FontWeight="SemiBold" Foreground="#ef4444"/>
+                <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="#cca0a0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Success -->
+        <Border Background="#1b2d1b" BorderBrush="#265c26" BorderThickness="1"
+                CornerRadius="8" Padding="16"
+                IsVisible="{Binding IsDone}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="✓ USB stick is ready"
+                           FontWeight="SemiBold" Foreground="#22c55e"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#a0cca0" FontSize="13"
+                           Text="kiosk-os has been written to the USB stick. You can now plug it into your kiosk PC and boot from it."/>
+            </StackPanel>
+        </Border>
+
+        <!-- Action Button -->
+        <Button Content="Start flashing"
+                Command="{Binding StartFlashCommand}"
+                IsVisible="{Binding !IsFlashing}"
+                IsEnabled="{Binding !IsDone}"
+                HorizontalAlignment="Left"
+                Padding="20,10"
+                Background="#dc2626" Foreground="White"
+                BorderBrush="#dc2626"/>
+    </StackPanel>
+</UserControl>

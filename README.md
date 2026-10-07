@@ -111,11 +111,11 @@ qemu-system-x86_64 -cdrom result/iso/kiosk-os.iso -m 2G -enable-kvm
 ```
 modules/          NixOS modules (core system configuration)
 scripts/          Runtime scripts (config parser, idle watcher, health check)
-wizard/           Setup wizard (planned)
+wizard/           Setup wizard (Windows/Linux, Avalonia)
 configs/          Example configuration files
 docs/             Documentation
 assets/           Splash screen, default wallpaper, error page
-tests/            Automated tests
+tests/            Automated tests and VM test harness (tests/vm)
 ```
 
 ## Migrating from Porteus Kiosk

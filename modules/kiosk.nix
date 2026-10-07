@@ -2,50 +2,59 @@
 
 let
   kioskStartScript = pkgs.writeShellScript "kiosk-start" ''
-    set -euo pipefail
+    set -uo pipefail
+    export PATH="/run/current-system/sw/bin:$PATH"
 
-    CONFIG_FILE="/etc/kiosk/config"
-    HOMEPAGE="https://example.com"
-    WALLPAPER=""
-    BROWSER_MODE="kiosk"
+    HOMEPAGE=$(kiosk-conf homepage https://example.com)
+    WALLPAPER=$(kiosk-conf wallpaper)
+    BROWSER_MODE=$(kiosk-conf browser_mode kiosk)
 
-    # Parse config
-    if [ -f "$CONFIG_FILE" ]; then
-      while IFS='=' read -r key value; do
-        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
-        case "$key" in
-          homepage) HOMEPAGE="$value" ;;
-          wallpaper) WALLPAPER="$value" ;;
-          browser_mode) BROWSER_MODE="$value" ;;
-        esac
-      done < "$CONFIG_FILE"
+    # Installer override (set by kiosk-installer-gate on live media)
+    OVERRIDE=""
+    if [ -f /run/kiosk/homepage-override ]; then
+      OVERRIDE=$(cat /run/kiosk/homepage-override)
     fi
 
-    # Installer override
-    if [ -f /tmp/kiosk-homepage-override ]; then
-      HOMEPAGE=$(cat /tmp/kiosk-homepage-override)
-    fi
-
-    # Wallpaper
+    # Wallpaper (visible during startup and if the browser restarts)
     if [ -n "$WALLPAPER" ]; then
-      ${pkgs.curl}/bin/curl -sL "$WALLPAPER" -o /tmp/wallpaper.jpg 2>/dev/null || true
-      if [ -f /tmp/wallpaper.jpg ]; then
-        ${pkgs.swaybg}/bin/swaybg -i /tmp/wallpaper.jpg -m fill &
+      curl -sfL --max-time 15 "$WALLPAPER" -o "$XDG_RUNTIME_DIR/wallpaper" 2>/dev/null || true
+      if [ -s "$XDG_RUNTIME_DIR/wallpaper" ]; then
+        ${pkgs.swaybg}/bin/swaybg -i "$XDG_RUNTIME_DIR/wallpaper" -m fill &
       fi
     elif [ -f /etc/kiosk/wallpaper-default.jpg ]; then
       ${pkgs.swaybg}/bin/swaybg -i /etc/kiosk/wallpaper-default.jpg -m fill &
     fi
 
-    # Browser mode flags
-    MODE_FLAGS=""
-    case "$BROWSER_MODE" in
-      fullscreen) MODE_FLAGS="--start-fullscreen" ;;
-      *)          MODE_FLAGS="--kiosk" ;;
-    esac
+    URL="$HOMEPAGE"
+    if [ -n "$OVERRIDE" ]; then
+      URL="$OVERRIDE"
+    else
+      # Wait up to 30s for the homepage to become reachable. If it is not,
+      # show the local error page, which keeps retrying and redirects once
+      # the homepage is up.
+      case "$HOMEPAGE" in
+        http://*|https://*)
+          reachable=no
+          for i in $(seq 1 15); do
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 "$HOMEPAGE"; then
+              reachable=yes; break
+            fi
+            sleep 2
+          done
+          if [ "$reachable" = no ]; then
+            ENC=$(printf '%s' "$HOMEPAGE" | ${pkgs.jq}/bin/jq -sRr @uri)
+            URL="file:///etc/kiosk/error-page.html?url=$ENC"
+          fi
+          ;;
+      esac
+    fi
 
-    # Launch Chromium
+    # kiosk: no browser UI at all. fullscreen: toolbar with back button and
+    # address bar — cage already gives the window the whole screen, while
+    # Chromium's own --start-fullscreen would hide exactly that toolbar.
+    MODE_FLAGS="--kiosk"
+    [ "$BROWSER_MODE" = "fullscreen" ] && MODE_FLAGS="--start-maximized"
+
     exec ${pkgs.chromium}/bin/chromium \
       $MODE_FLAGS \
       --no-first-run \
@@ -59,10 +68,13 @@ let
       --disable-translate \
       --disable-sync \
       --disable-features=TranslateUI \
+      --disable-pinch \
+      --overscroll-history-navigation=0 \
+      --check-for-update-interval=31536000 \
       --disable-gpu \
-      --incognito \
       --ozone-platform=wayland \
-      "$HOMEPAGE"
+      --user-data-dir="$XDG_RUNTIME_DIR/chromium" \
+      "$URL"
   '';
 in
 {
@@ -80,15 +92,26 @@ in
     extraArguments = [ "-d" ];
   };
 
-  systemd.tmpfiles.rules = [
-    "d /etc/kiosk 0755 root root -"
-  ];
+  systemd.services."cage-tty1" = {
+    after = [ "kiosk-config-fetcher.service" "kiosk-installer-gate.service" ];
+    wants = [ "kiosk-config-fetcher.service" ];
+    # Keyboard layout etc. written by the config fetcher
+    serviceConfig.EnvironmentFile = "-/run/kiosk/cage.env";
+    serviceConfig.Restart = lib.mkForce "always";
+    serviceConfig.RestartSec = 2;
+  };
+
+  environment.etc."kiosk/error-page.html" = {
+    source = ../assets/error-page.html;
+    mode = "0644";
+  };
 
   environment.systemPackages = with pkgs; [
     chromium
     cage
     swaybg
     curl
+    jq
   ];
 
   environment.sessionVariables = {

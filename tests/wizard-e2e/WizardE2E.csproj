@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Headless driver for the setup wizard's real write path, used by the VM
+    tests (tests/vm). It goes through the same view model, config
+    serializer, FlashService and ConfigWriterService as the GUI; only the
+    clicking is replaced by command line arguments.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\wizard\KioskOsWizard\KioskOsWizard.csproj" />
+  </ItemGroup>
+
+</Project>
+

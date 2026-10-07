@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ ... }:
 
 {
   networking = {
@@ -21,7 +21,10 @@
   };
 
   services.timesyncd.enable = true;
-  time.timeZone = lib.mkDefault "Europe/Berlin";
+
+  # null keeps /etc/localtime writable so the config file can set the
+  # timezone at runtime via timedatectl. A fixed value makes it read-only.
+  time.timeZone = null;
 
   services.avahi = {
     enable = true;

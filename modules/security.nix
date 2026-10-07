@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ ... }:
 
 {
   # Disable virtual consoles and Ctrl+Alt+Del
@@ -21,17 +21,17 @@
     BookmarkBarEnabled = false;
     EditBookmarksEnabled = false;
     ExtensionInstallBlocklist = [ "*" ];
-    IncognitoModeAvailability = 1;
+    # Forced incognito: nothing a visitor did survives a session reset
+    IncognitoModeAvailability = 2;
     BrowserSignin = 0;
     SyncDisabled = true;
     ShowHomeButton = true;
     HomepageIsNewTabPage = true;
-    MaximumTabsPerBrowser = 1;
+    DefaultBrowserSettingEnabled = false;
+    TranslateEnabled = false;
+    MetricsReportingEnabled = false;
   };
 
   # Disable core dumps
   systemd.coredump.enable = false;
-
-  # No sudo for kiosk user
-  security.sudo.enable = false;
 }
