@@ -198,7 +198,27 @@ let
     fi
 
     # --- Keyboard layout (read by cage via EnvironmentFile) ---
-    printf 'XKB_DEFAULT_LAYOUT=%s\n' "$(config_value primary_keyboard_layout us)" > "$RUN_DIR/cage.env"
+    # An XKB layout name the compositor does not know leaves it without a
+    # keymap, and then no key press reaches the browser at all (the mouse
+    # keeps working). "en" is the classic: it is a language, not a layout.
+    # Translate the obvious spellings and fall back to "us" for anything else.
+    LAYOUT=$(config_value primary_keyboard_layout us | tr 'A-Z' 'a-z')
+    case "$LAYOUT" in
+      en|en_us|en-us|english|us_en|en_en) LAYOUT=us ;;
+      en_gb|en-gb|uk|british) LAYOUT=gb ;;
+      de_de|de-de|german) LAYOUT=de ;;
+      fr_fr|fr-fr|french) LAYOUT=fr ;;
+    esac
+    XKB_SYMBOLS="${pkgs.xkeyboard_config}/share/X11/xkb/symbols"
+    for l in $(echo "$LAYOUT" | tr ',' ' '); do
+      if [ ! -f "$XKB_SYMBOLS/''${l%%(*}" ]; then
+        log "Unknown keyboard layout '$(config_value primary_keyboard_layout)' — using us (valid: us, gb, de, fr, es, ...)"
+        LAYOUT=us
+        break
+      fi
+    done
+    printf 'XKB_DEFAULT_LAYOUT=%s\n' "$LAYOUT" > "$RUN_DIR/cage.env"
+    log "Keyboard layout: $LAYOUT"
 
     # --- USB mass storage ---
     # /etc/udev/rules.d is read-only on NixOS; /run/udev/rules.d is not.
